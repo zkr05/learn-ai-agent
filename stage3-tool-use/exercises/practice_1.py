@@ -3,9 +3,9 @@
 # Note: Stage 3+ 用 qwen2.5:3b（tool-use 稳定）、不是 gemma4:e4b
 #
 # 作业：跑完后在顶部注释回答：
-# 观察1（模型选了什么工具、参数）：_____模型选了weather_tool，参数_______________________________
-# 观察2（finish_reason 是什么）：______tool_calls______________________________
-# 观察3（如果没给 tools，模型会怎么答）：__模型会停止，不会给出输出__________________________________
+# 观察1（模型选了什么工具、参数）：模型选了 get_weather 工具，参数 city="台北"
+# 观察2（finish_reason 是什么）：finish_reason 是 tool_calls——表示模型不直接回答，而是想调用工具
+# 观察3（如果没给 tools，模型会怎么答）：没给 tools 时模型直接文字回答(finish_reason=stop)，凭训练知识瞎编或说不知道——没有工具可调，无法真正查天气
 
 import sys, json
 if hasattr(sys.stdout, "reconfigure"):
