@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# 临时文件（AGENTS.md 提交前检查项）
+*.part
+*.tmp
+
+# 本地环境变量
+.env
