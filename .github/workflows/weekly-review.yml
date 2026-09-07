@@ -1,0 +1,25 @@
+name: weekly-review
+
+# TODO 6（SPEC）：补全这个 workflow
+# 要求：
+#   1. 每周一北京时间 10:00 自动跑（提示：UTC cron，0 2 * * 1）+ workflow_dispatch 手动触发
+#   2. checkout 要 fetch-depth: 0（agent 要读完整 git 历史，想想为什么）
+#   3. Python 3.11 + pip install -r study-review-agent/requirements.txt
+#   4. 运行:  cd study-review-agent && python review_agent.py --backend cloud --days 7
+#      （需要 env: CLOUD_API_KEY=${{ secrets.LLM_API_KEY }}，可选 vars 见 SPEC 环境变量表）
+#   5. 把 reports/ 下的报告 commit 回仓库并 push
+#      （提示：git config user.name/email，git add，git diff --cached --quiet || git commit，git push）
+
+on:
+  workflow_dispatch: {} # 手动触发已配好，schedule 自己补
+
+permissions:
+  contents: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0

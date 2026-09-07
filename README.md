@@ -4,11 +4,13 @@
 
 每个 stage 都是"概念 → 亲手写 → 自建 eval 验证 → 出口考核"的闭环，所有练习可运行、带观察记录。毕业设计是一个**真在 GitHub Actions 上每周自动跑的 production agent**（见下方亮点项目）。
 
-## 🏆 亮点项目：study-review agent（每周自动学习复盘）
+## 🏆 毕业设计：study-review agent（每周自动学习复盘，开发中）
 
-把 Stage 5 的 study-review skill 按 Stage 7 生产化设计升级成完整 agent：[`study-review-agent/`](study-review-agent/)
+把 Stage 5 的 study-review skill 按 Stage 7 生产化设计升级成完整 agent：[`study-review-agent/`](study-review-agent/)（[需求文档 SPEC](study-review-agent/SPEC.md)）
 
-| 能力 | 实现 |
+设计中的 Harness 元件：
+
+| 能力 | 设计 |
 |---|---|
 | 数据采集 | tool registry 管理 git log / 练习扫描 / 踩坑提取 / 上周报告记忆，错误作为数据返回（不 raise） |
 | 模型后端 | 本地 Ollama（$0）与云端 OpenAI 兼容 API 双后端，`auto` 模式自动探测 + fallback |
