@@ -34,7 +34,6 @@ RUN_LOG_PATH = REPORTS_DIR / "run_log.jsonl"
 
 CST = timezone(timedelta(hours=8))  # 北京时间
 MAX_TOKENS = 1500
-
 # 格式契约（SPEC：报告标题必须逐字一致，eval 也靠它校验）
 SECTION_HEADERS = [
     "## 本周学习进度回顾",
@@ -47,7 +46,10 @@ SECTION_HEADERS = [
 def env(name: str, default: str = "") -> str:
     """读环境变量。注意：空字符串要视为未设置（Actions 未配 var 会传空值）。"""
     # TODO 1: 实现
-    raise NotImplementedError
+    value = os.environ.get(name,"")
+    if not value:
+        return default
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -61,9 +63,31 @@ def resolve_backend(choice: str) -> dict:
     - cloud:  OpenAI 兼容 API，必须配置 CLOUD_API_KEY，否则报错退出
     - auto:   用 client.models.list() 带 3s 超时探测本地；不通则 fallback 云端
     """
-    raise NotImplementedError
-
-
+    if choice == "local":
+        return {
+            "name": "local",
+            "base_url": env("LOCAL_BASE_URL", "http://localhost:11434/v1"),
+            "model": env("LOCAL_MODEL", "qwen2.5:7b"),
+            "api_key": "ollama",
+        }
+    if choice == "cloud":
+        key = env("CLOUD_API_KEY")
+        if not key:
+            print("key为空")
+            raise SystemExit(1)
+        return {
+            "name": "cloud",
+            "base_url": env("CLOUD_BASE_URL", "https://api.openai.com/v1"),
+            "model": env("CLOUD_MODEL", "gpt-4o-mini"),
+            "api_key": key,
+        }
+    if choice == "auto":
+        client = OpenAI(base_url=env("LOCAL_BASE_URL","http://localhost:11434/v1"),api_key ="ollama", timeout=3.0)
+        try:
+           client.models.list()
+           return resolve_backend("local")
+        except Exception:
+           return resolve_backend("cloud")
 # ---------------------------------------------------------------------------
 # TODO 2 · Tool registry：错误作为数据返回，不许 raise
 # ---------------------------------------------------------------------------
