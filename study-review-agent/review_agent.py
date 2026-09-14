@@ -88,6 +88,8 @@ def resolve_backend(choice: str) -> dict:
            return resolve_backend("local")
         except Exception:
            return resolve_backend("cloud")
+    print(f"错误：未知后端 '{choice}'，可选 local / cloud / auto")
+    raise SystemExit(1)
 # ---------------------------------------------------------------------------
 # TODO 2 · Tool registry：错误作为数据返回，不许 raise
 # ---------------------------------------------------------------------------
@@ -99,7 +101,8 @@ def register_tool(name: str, description: str):
     """装饰器：把函数注册进 TOOL_REGISTRY（name -> {"impl": fn, "description": ...}）。"""
     # 提示：和 Stage 4 的 @tool 一个思路，但这里给你自己的采集流水线用
     def deco(fn):
-        ...
+        TOOL_REGISTRY[name] = fn
+        return fn
     return deco
 
 
@@ -107,13 +110,41 @@ def register_tool(name: str, description: str):
 def get_git_log(days: int = 7) -> dict:
     """subprocess 跑 git log --since=<N天前> --pretty=%ad|%s --date=short，cwd=REPO_ROOT。
     失败返回 {"error":..., "retry_hint":...}（想想 Stage 3 的'错误是数据'）。"""
-    raise NotImplementedError
-
-
+    try:
+        result = subprocess.run(
+            ["git", "log", f"--since={days} days ago", "--pretty=%ad|%s", "--date=short"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if result.returncode != 0:
+            return {"error": f"git log失败: {result.stderr.strip()}", "retry_hint": "确认git仓库存在且cwd正确"}
+        commits = [line for line in result.stdout.strip().splitlines() if line]
+        return {"commits": commits, "count": len(commits)}
+    except Exception as e:
+        return {"error": f"错误原因{e}","retry_hint": "检查git命令是否正确"} 
 @register_tool("scan_stages", "扫描各 stage 目录，统计练习/笔记文件数量和最近修改时间")
 def scan_stages() -> dict:
     """遍历 REPO_ROOT.glob("stage*")，每个 stage 统计 .py/.md 文件数和最新 mtime。"""
-    raise NotImplementedError
+    try:
+        stages = []
+        for d in sorted(REPO_ROOT.glob("stage*")):
+            if not d.is_dir():
+                continue
+            py_count = len(list(d.rglob("*.py")))
+            md_count = len(list(d.rglob("*.md")))
+            files = list(d.rglob("*"))
+            latest = max((f.stat().st_mtime for f in files if f.is_file()), default=0)
+            if latest:
+                latest = datetime.fromtimestamp(latest).strftime("%Y-%m-%d")
+            else:
+                latest = "无"
+            stages.append({"name": d.name, "py_files": py_count, "md_files": md_count, "latest": latest})
+        return {"stages": stages}
+    except Exception as e:
+        return {"error": f"遇到错误原因为：{e}", "retry_hint": "确认仓库目录存在且文件可读"}
 
 
 @register_tool("read_pitfalls", "读取 LEARNING-ROUTE.md 中的踩坑记录清单")
@@ -229,4 +260,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    print(get_git_log(30))
+    print(scan_stages())
