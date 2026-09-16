@@ -231,12 +231,32 @@ def timed(label: str, stats: list):
 def call_llm(client: OpenAI, cfg: dict, system: str, user: str, stats: list) -> tuple[str, dict]:
     """调用 chat.completions，返回 (回复文本, {"input": n, "output": n})。
     token 数从 resp.usage 里拿；把 tokens 也写进 stats。"""
-    raise NotImplementedError
+    with timed("call_llm", stats):
+        resp = client.chat.completions.create(
+            model = cfg["model"],
+            messages = [{"role": "system", "content":system},
+                        {"role": "user", "content":user}]
+        )
+        in_tokens = resp.usage.prompt_tokens
+        out_tokens = resp.usage.completion_tokens
+        stats.append({"tokens": {"input": in_tokens, "output": out_tokens}})
+        text = resp.choices[0].message.content
+        return text , {"input": in_tokens, "output": out_tokens}
 
 
 def estimate_cost(cfg: dict, tokens: dict) -> float | None:
     """仅 cloud 后端且配置了 CLOUD_PRICE_IN/OUT（每百万 token 单价）才算，否则 None。"""
-    raise NotImplementedError
+    if cfg["name"] != "cloud":
+        return None
+    price_in = env("CLOUD_PRICE_IN")
+    price_out = env("CLOUD_PRICE_OUT")
+    if not price_in or not price_out:
+        return None
+    price_in = float(price_in)
+    price_out = float(price_out)
+    cost = (tokens["input"] * price_in + tokens["output"] * price_out) / 1_000_000
+    return cost
+
 
 
 # ---------------------------------------------------------------------------
