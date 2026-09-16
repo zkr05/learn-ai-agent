@@ -150,24 +150,65 @@ def scan_stages() -> dict:
 @register_tool("read_pitfalls", "读取 LEARNING-ROUTE.md 中的踩坑记录清单")
 def read_pitfalls() -> dict:
     """取 '## 4.' 到 '## 5.' 之间的数字开头的行。文档缺失/结构变了都要返回 error 数据。"""
-    raise NotImplementedError
+    try:
+        doc = REPO_ROOT / "LEARNING-ROUTE.md"
+        text = doc.read_text(encoding="utf-8")
+        start = text.find("## 4.")
+        end = text.find("## 5.")
+        if start == -1 or end == -1:
+            return {"error": "LEARNING-ROUTE.md 里找不到 '## 4.'或'## 5.' 章节","retry_hint": "确认文档结构未变"}
+        section = text[start:end]
+        pitfalls = [line.strip() for line in section.splitlines()
+                    if line.strip() and line.strip()[0].isdigit()]
+        return {"pitfalls": pitfalls, "count": len(pitfalls)}
+    except Exception as e:
+        return {"error": f"错误原因{e}", "retry_hint": "检查文件是否存在"}
 
 
 @register_tool("read_selfcheck", "读取 LEARNING-ROUTE.md 中的毕业自测清单")
 def read_selfcheck() -> dict:
     """取 '## 5.' 之后的 '- [' 开头的行。"""
-    raise NotImplementedError
-
+    try:
+        doc = REPO_ROOT / "LEARNING-ROUTE.md"
+        text = doc.read_text(encoding="utf-8")
+        start = text.find("## 5.")
+        if start == -1:
+            return {"error": "LEARNING-ROUTE.md 里找不到 '## 5.'之后章节", "retry_hint": "检查文档结构"}
+        section = text[start:]
+        items = [line.strip() for line in section.splitlines()
+                if line.strip().startswith("- [")]
+        return {"selfcheck": items, "count": len(items)}
+    except Exception as e:
+        return {"error": f"错误原因：{e}", "retry_hint": "检查文件是否存在"}
 
 @register_tool("read_last_report", "读取最近一份复盘报告（跨 session 长期记忆）")
 def read_last_report() -> dict:
     """glob('????-W??-review.md') 取最新一份，读前 3000 字符。没有则返回 {"memory": None}。"""
-    raise NotImplementedError
+    try:
+        files = list(REPORTS_DIR.glob("????-W??-review.md"))
+        if not files:
+            return {"memory": None}
+        latest = sorted(files)[-1]
+        content = latest.read_text(encoding="utf-8")[:3000]
+        return {"memory": content, "file": latest.name}
+    except Exception as e:
+        return {"error": f"错误原因{e}", "retry_hint": "检查文件是否存在"}
 
 
 def collect_context(days: int, stats: list) -> dict:
     """跑全部采集工具组装上下文；顺手给每个工具记 latency（observability）。"""
-    raise NotImplementedError
+    context = {}
+    with timed("tool:git_log", stats):
+        context["git_log"] = get_git_log(days)
+    with timed("tool:scan_stages", stats):
+        context["scan_stages"] = scan_stages()
+    with timed("tool:read_pitfalls", stats):
+        context["pitfalls"] = read_pitfalls()
+    with timed("tool:read_selfcheck", stats):
+        context["selfcheck"] = read_selfcheck()
+    with timed("tool:read_last_report", stats):
+        context["last_report"] = read_last_report()
+    return context
 
 
 # ---------------------------------------------------------------------------
@@ -177,7 +218,14 @@ def collect_context(days: int, stats: list) -> dict:
 @contextmanager
 def timed(label: str, stats: list):
     """Stage 7 练习 3 的老朋友：计时 contextmanager，结束把 latency 写进 stats。"""
-    raise NotImplementedError
+    t0 = time.perf_counter()
+    try:
+        yield
+    finally:
+        elapsed = (time.perf_counter() - t0) * 1000
+        stats.append({"tool": label, "latency_ms": elapsed})
+
+
 
 
 def call_llm(client: OpenAI, cfg: dict, system: str, user: str, stats: list) -> tuple[str, dict]:
@@ -261,5 +309,9 @@ def main() -> None:
 
 if __name__ == "__main__":
     # main()
-    print(get_git_log(30))
-    print(scan_stages())
+    stats = []
+    ctx = collect_context(7, stats)
+    print(list(ctx.keys()))
+    print(ctx["git_log"]["count"])
+    print(ctx["pitfalls"]["count"])
+    print(stats)
