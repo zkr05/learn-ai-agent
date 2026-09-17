@@ -1,0 +1,1 @@
+{"event": "eval", "pass_rate": 0.75, "results": [{"id": "structure", "passed": true}, {"id": "honesty", "passed": true}, {"id": "pitfall", "passed": true}, {"id": "demo_fail", "passed": false}]}

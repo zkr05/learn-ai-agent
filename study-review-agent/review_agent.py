@@ -327,19 +327,66 @@ def append_run_log(entry: dict) -> None:
 
 def empty_context() -> dict:
     """所有工具返回空数据的上下文，测诚实性用。"""
-    raise NotImplementedError
+    return {
+        "git_log":    {"commits": [],"count": 0},
+        "scan_stages":{"stages": []},
+        "pitfalls":   {"pitfalls": [],"count": 0},
+        "selfcheck":  {"selfcheck": [],"count": 0},
+        "last_report":{"memory": None},
+    }
 
 
 def build_eval_cases() -> list:
     """至少 4 个用例：structure / honesty / pitfall / demo_fail（见 SPEC）。
     demo_fail 的期望是错的（应挂）——它挂了才证明 eval 能发现错误。"""
-    raise NotImplementedError
+    def ctx_with_pitfall():
+        c = empty_context()
+        c["pitfalls"] = {"pitfalls": ["6. **embedding 大小写敏感**: ReAct≠React"], "count": 1}
+        return c
+
+    return [
+        {
+            "id": "structure",
+            "context": collect_context(7,[]),
+            "check": lambda r: not check_structure(r),
+        },
+        {
+            "id": "honesty",
+            "context": empty_context(),
+            "check": lambda r: any(w in r for w in ["本周无","无记录","暂无"]),
+        },
+        {
+            "id": "pitfall",
+            "context": ctx_with_pitfall(),
+            "check": lambda r: "embedding" in r.lower(),
+        },
+        {
+            "id": "demo_fail",
+            "context": empty_context(),
+            "check": lambda r: "绝不存在的词xyz" in r,
+        },
+    ]
 
 
 def run_eval(client: OpenAI, cfg: dict) -> float:
-    """逐个跑用例，打印 ✅/❌ 和通过率，结果追加进 run_log.jsonl。"""
-    raise NotImplementedError
+    """逐个跑用例，打印 ✅/ 和通过率，结果追加进 run_log.jsonl。"""
+    cases = build_eval_cases()
+    results = []
 
+    for case in cases:
+        context = case["context"]
+        stats = []
+        report, tokens = generate_report(client,cfg,context,stats)
+        passed = case["check"](report)
+        print(f"{'✅' if passed else '❌'} [{case['id']}]")
+        results.append({"id": case["id"],"passed": passed})
+    pass_count = sum(1 for r in results if r["passed"])
+    pass_rate = pass_count / len(results)
+    print(f"通过率: {pass_count}/{len(results)} ({pass_rate: .0%})")
+    print("  注：demo_fail 应该挂才证明eval有效")
+
+    append_run_log({"event": "eval", "pass_rate": pass_rate, "results": results})
+    return pass_rate
 
 # ---------------------------------------------------------------------------
 # TODO 6 · 主流程
