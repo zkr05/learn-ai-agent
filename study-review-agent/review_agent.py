@@ -277,23 +277,48 @@ SYSTEM_PROMPT = (
 
 def check_structure(report: str) -> list:
     """返回缺失的标题列表（空列表 = 结构完整）。"""
-    raise NotImplementedError
+    return [h for h in SECTION_HEADERS if h not in report]
 
 
 def generate_report(client: OpenAI, cfg: dict, context: dict, stats: list) -> tuple[str, dict]:
     """生成报告；结构不完整时把缺失标题反馈给模型重试一次（retry recovery）。
     重试也要记进 stats（比如 {"retry": True, "missing": [...]}）。"""
-    raise NotImplementedError
+    data_text = json.dumps(context, ensure_ascii=False, indent=2)
+    user_prompt = f"""这是本周采集到的学习数据：
+
+    {data_text}
+
+    请根据这些数据写周报。"""
+    report,tokens = call_llm(client, cfg, SYSTEM_PROMPT, user_prompt, stats)
+    missing = check_structure(report)
+    if missing:
+        retry_prompt = f"""你上次的输出缺少这些标题：{missing}
+    请重新生成完整报告，必须包含全部4个标题。
+    
+    原始数据：
+    {data_text}"""
+
+        report2,tokens2 = call_llm(client, cfg, SYSTEM_PROMPT, retry_prompt, stats)
+        report = report2
+        tokens["input"] += tokens2["input"]
+        tokens["output"] += tokens2["output"]
+        stats.append({"retry": True, "missing": missing})
+
+    return report, tokens
 
 
 def report_filename(now: datetime | None = None) -> str:
     """按北京时间 isocalendar() 生成 '2026-W37-review.md' 这样的文件名。"""
-    raise NotImplementedError
+    now = now or datetime.now(CST)
+    iso = now.isocalendar()
+    return f"{iso.year}-W{iso.week:02d}-review.md"
 
 
 def append_run_log(entry: dict) -> None:
     """把运行遥测追加写入 reports/run_log.jsonl（一行一个 JSON）。"""
-    raise NotImplementedError
+    REPORTS_DIR.mkdir(exist_ok = True)
+    with open(RUN_LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 # ---------------------------------------------------------------------------
