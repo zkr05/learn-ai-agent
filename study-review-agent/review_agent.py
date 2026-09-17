@@ -396,14 +396,42 @@ def main() -> None:
     """argparse 解析参数 → resolve_backend → （--eval 则跑评估）→
     collect_context → generate_report → 写 reports/YYYY-WNN-review.md →
     打印 ✅ 报告路径 + tokens/成本统计 → 遥测写入 run_log.jsonl。"""
-    raise NotImplementedError
+    parser = argparse.ArgumentParser(description = "每周学习复盘agent")
+    parser.add_argument("--backend", default="auto", choices=["local","cloud","auto"],
+                        help="模型后端")
+    parser.add_argument("--days", type=int, default=7,help="复盘最近N天")
+    parser.add_argument("--eval", action="store_true",help="只跑eval harness")
 
+    args = parser.parse_args()
+    cfg = resolve_backend(args.backend)
+    client = OpenAI(base_url=cfg["base_url"], api_key=cfg["api_key"])
+
+    if args.eval:
+        run_eval(client,cfg)
+        return
+    
+    stats = []
+    context = collect_context(args.days, stats)
+    report, tokens = generate_report(client, cfg, context, stats)
+
+    REPORTS_DIR.mkdir(exist_ok=True)
+    report_path = REPORTS_DIR / report_filename()
+    report_path.write_text(report, encoding="utf-8")
+
+    cost = estimate_cost(cfg, tokens)
+    append_run_log({
+        "event": "report",
+        "file": report_path.name,
+        "days": args.days,
+        "backend": cfg["name"],
+        "tokens": tokens,
+        "cost": cost,
+        "stats": stats,
+    })
+
+    print(f"✅ 报告已生成：{report_path}")
+    print(f"    tokens: {tokens['input']} in / {tokens['output']} out")
+    print(f"   成本：{cost if cost is not None else '$0 (本地)'}")
 
 if __name__ == "__main__":
-    # main()
-    stats = []
-    ctx = collect_context(7, stats)
-    print(list(ctx.keys()))
-    print(ctx["git_log"]["count"])
-    print(ctx["pitfalls"]["count"])
-    print(stats)
+    main()
