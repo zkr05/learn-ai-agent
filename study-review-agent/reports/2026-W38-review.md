@@ -1,17 +1,16 @@
 ## 本周学习进度回顾
 
-本周采集到 6 次提交，全部围绕毕业设计：
+本周采集到 7 次提交，全部围绕毕业设计：
 
-- 2026-09-14 毕业设计第二天：tool registry 部分实现（register_tool + git_log + scan_stages）
-- 2026-09-16 毕业设计第三天：tool registry 完成（5个采集工具 + collect_context + timed)
-- 2026-09-16 毕业设计第四天：LLM调用包装 + token 记账
-- 2026-09-17 毕业设计第五天：报告生成（prompt组装 + 结构校验 + 带反馈重试）
-- 2026-09-17 毕业设计第六天：eval harness（4用例含故意挂的demo_fail）
-- 2026-09-17 毕业设计第七天：main主流程（argparse + 端到端跑通）
+- 2026-09-14|毕业设计第二天：tool registry 部分实现（register_tool + git_log+ scan_stages)
+- 2026-09-16|毕业设计第三天：tool registry 完成（5个采集工具 + collect_context + timed)
+- 2026-09-16|毕业设计第四天：LLM调用包装 + token 记账
+- 2026-09-17|毕业设计第五天：报告生成（prompt组装 + 结构校验 + 带反馈重试）
+- 2026-09-17|毕业设计第六天：eval harness（4用例含故意挂的demo_fail）
+- 2026-09-17|毕业设计第七天：main主流程（argparse + 端到端跑通）
+- 2026-09-18|毕业设计第八天：Github Actions workflow(每周一自动跑)
 
-stage 扫描的 7 个阶段目录本周无更新，最近更新为 stage7-production（2026-08-28）。
-
-以上提交与上期 W38 复盘（2026-W38-review.md）记录的内容一致。
+stage 扫描：7 个阶段目录最近更新日期均为 2026-09-18，其中 stage1-llm-basics（7 py / 2 md）、stage2-prompt-eng（6 / 3）、stage3-tool-use（12 / 3）、stage4-frameworks（7 / 3）、stage5-claude-code（1 / 2）、stage6-memory-rag（2 / 2）、stage7-production（6 / 2）。
 
 ## 易错点/踩坑提取
 
@@ -29,9 +28,9 @@ stage 扫描的 7 个阶段目录本周无更新，最近更新为 stage7-produc
 
 ## 下周学习建议
 
-- 对照 6 条自查清单逐项验证：ReAct 循环、RAG 搭建（embed→retrieve→generate）、eval 通过率、MCP/Skill/AGENTS.md 区别、框架/手写/RAG/multi-agent 取舍、Harness 8 元件。
-- 承接毕业设计收尾，优先处理坑 5、7 的工具对齐与数据校验，坑 8 的独立验收 agent。
-- 本周无 RAG 相关提交，可补 RAG 练习。
+- 对照 6 条自查清单逐项验证：ReAct 循环 + 3 个坑、RAG（embed→retrieve→generate）、agent eval 与通过率、MCP/Skill/AGENTS.md 区别、框架/手写/RAG/multi-agent 取舍、Harness 8 元件。
+- 优先补坑 5（工具与模型对齐，已踩 3 次）和坑 7（工具返回数据校验），坑 8 尝试拆独立验收 agent。
+- 新增的 Actions workflow 上线前，按坑 9 确认 .codex/auth.json 等敏感文件未被提交。
 
 ## 作品集素材提醒
 
