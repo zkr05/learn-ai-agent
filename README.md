@@ -4,20 +4,27 @@
 
 每个 stage 都是"概念 → 亲手写 → 自建 eval 验证 → 出口考核"的闭环，所有练习可运行、带观察记录。毕业设计是一个**真在 GitHub Actions 上每周自动跑的 production agent**（见下方亮点项目）。
 
-## 🏆 毕业设计：study-review agent（每周自动学习复盘，开发中）
+## 🏆 毕业设计：study-review agent（每周自动学习复盘）✅
+
+[![weekly-review](https://github.com/zkr05/learn-ai-agent/actions/workflows/weekly-review.yml/badge.svg)](https://github.com/zkr05/learn-ai-agent/actions/workflows/weekly-review.yml)
 
 把 Stage 5 的 study-review skill 按 Stage 7 生产化设计升级成完整 agent：[`study-review-agent/`](study-review-agent/)（[需求文档 SPEC](study-review-agent/SPEC.md)）
 
-设计中的 Harness 元件：
+**它真的在跑**：每周一北京时间 10:00，GitHub Actions 自动启动 → 采集仓库真实数据（git 历史 / stage 扫描 / 踩坑清单 / 上周报告）→ 调云端 LLM 生成报告 → 自动 commit 回仓库。→ [查看历次报告](study-review-agent/reports/)
 
-| 能力 | 设计 |
+Harness 元件（全部亲手实现）：
+
+| 能力 | 实现 |
 |---|---|
-| 数据采集 | tool registry 管理 git log / 练习扫描 / 踩坑提取 / 上周报告记忆，错误作为数据返回（不 raise） |
-| 模型后端 | 本地 Ollama（$0）与云端 OpenAI 兼容 API 双后端，`auto` 模式自动探测 + fallback |
-| Eval harness | 结构完整性 / 诚实性（数据为空时必须说"无"）/ 内容正确性用例，含故意挂掉的 demo 用例 |
-| Observability | 每次 LLM 调用记录 latency + token 用量，追加写入 `run_log.jsonl` |
-| 成本控制 | 按 token 记账，可配置单价自动算成本；本地后端 $0 |
-| 自动化 | GitHub Actions 每周一自动运行，报告自动 commit 回仓库（CI/CD 闭环） |
+| 数据采集 | tool registry 管理 5 个工具，错误作为数据返回（`{"error", "retry_hint"}`）不 raise |
+| 模型后端 | 本地 Ollama（$0）与云端 OpenAI 兼容 API 双后端；`auto` 模式 3s 探测 + fallback |
+| Retry recovery | 报告缺标题时，把缺失项反馈给模型重试一次；重试计入 stats |
+| Eval harness | 4 用例：结构完整性 / 诚实性（空数据必须说"无"）/ 内容正确性 / 故意挂掉的 demo → 通过率 3/4（demo 挂才证明 eval 有效）|
+| Observability | 每次调用记录 latency + token，追加写入 `run_log.jsonl`（可查每次运行的耗时与用量）|
+| 成本控制 | 按 token 记账 + 可配单价自动算成本；本地 $0、云端每周 ≈ $0.0006 |
+| 自动化 | GitHub Actions 定时（cron）+ 手动触发，报告自动 commit（完整 CI/CD 闭环）|
+
+**运行实测**（数据来自 `run_log.jsonl`）：单次约 1.9k input / 0.9k output tokens；本地后端 $0，云端后端约 $0.0006/次。
 
 ## 技能清单
 
