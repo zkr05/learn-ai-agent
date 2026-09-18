@@ -22,7 +22,12 @@ jobs:
 
       - name: 装依赖
         run: pip install -r study-review-agent/requirements.txt
-
+      - name: 跑 eval (质量门禁)
+        run: cd study-review-agent && python review_agent.py --eval
+        env:
+          CLOUD_API_KEY: ${{ secrets.LLM_API_KEY }}
+          CLOUD_BASE_URL: "https://api.deepseek.com/v1"
+          CLOUD_MODEL: "deepseek-v4-flash"
       - name: 生成周报
         run: cd study-review-agent && python review_agent.py --backend cloud --days 7
         env:
