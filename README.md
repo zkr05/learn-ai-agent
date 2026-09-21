@@ -21,10 +21,12 @@ Harness 元件（全部亲手实现）：
 | Retry recovery | 报告缺标题时，把缺失项反馈给模型重试一次；重试计入 stats |
 | Eval harness | 4 用例：结构完整性 / 诚实性（空数据必须说"无"）/ 内容正确性 / 故意挂掉的 demo → 通过率 3/4（demo 挂才证明 eval 有效）|
 | Observability | 每次调用记录 latency + token，追加写入 `run_log.jsonl`（可查每次运行的耗时与用量）|
-| 成本控制 | 按 token 记账 + 可配单价自动算成本；本地 $0、云端每周 ≈ $0.0006 |
+| 成本控制 | 按 token 记账 + 可配单价自动算成本；本地 $0、云端约 $0.008/次 |
 | 自动化 | GitHub Actions 定时（cron）+ 手动触发，报告自动 commit（完整 CI/CD 闭环）|
 
-**运行实测**（数据来自 `run_log.jsonl`）：单次约 1.9k input / 0.9k output tokens；本地后端 $0，云端后端约 $0.0006/次。
+**代码分层**：通用 harness 已抽成 [`agent_kit.py`](agent_kit.py)（8 个可复用零件：后端解析 / 计时 / LLM 记账 / 成本核算 / 遥测日志 / 工具注册 / 结构校验），`review_agent.py` 只留学习复盘专属逻辑（441 → 318 行）。
+
+**运行实测**（数据来自 [`run_log.jsonl`](study-review-agent/reports/run_log.jsonl)）：累计 25 次运行记录（12 次 eval + 13 次报告）；本地后端 $0（单次约 1.8k input / 0.7k output），云端后端约 $0.008/次（约 1.9k / 1.6k，5 次合计 $0.038）。
 
 ## 技能清单
 
@@ -80,12 +82,14 @@ Harness 元件（全部亲手实现）：
 4. **9 条踩坑记录**沉淀成工程直觉（见 [LEARNING-ROUTE.md §4](LEARNING-ROUTE.md)）：推理模型吃 token、工具输入归一化、embedding 大小写敏感、模型改数字要校验……
 5. **成本敏感**：全路线用本机 Ollama $0 跑通，需要云端时先算 token 账
 6. **学习过程全部 git 留痕**，每个练习带自我验证（assert）和观察记录
+7. **会做重构**：毕业设计跑通后把通用 harness 抽成独立模块 `agent_kit.py`（8 个可复用零件）。关键动作是**参数化**——日志路径、报告标题、工具表都改成参数注入，否则通用模块会把业务信息硬编码进去；全程坚持「行为不变」原则，本地 / eval / 云端 / CI 四项验证全绿才提交（业务层代码减少 28%）
 
 ## 仓库结构
 
 ```text
 learn-ai-agent/
 ├── README.md                    # 本文件（作品集）
+├── agent_kit.py                 # 可复用 harness：后端解析/计时/LLM记账/成本/遥测/工具注册/结构校验
 ├── LEARNING-ROUTE.md            # Stage 0-7 复习地图 + 代码模板 + 踩坑记录
 ├── study-review-agent/          # 🏆 毕业设计：每周自动复盘 agent（GitHub Actions）
 ├── stage1-llm-basics/           # API 调用 / token / retry
