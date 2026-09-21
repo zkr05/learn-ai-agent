@@ -16,18 +16,19 @@ import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-import argparse  # TODO 6: 用它解析 --backend / --days / --eval
+import argparse  
 import json
-import os
 import subprocess
-import time
-from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from openai import OpenAI
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+
+from agent_kit import (env, resolve_backend, timed, call_llm,
+                       estimate_cost, append_run_log, check_structure, ToolRegistry)
 AGENT_DIR = Path(__file__).resolve().parent
 REPORTS_DIR = AGENT_DIR / "reports"
 RUN_LOG_PATH = REPORTS_DIR / "run_log.jsonl"
@@ -42,71 +43,10 @@ SECTION_HEADERS = [
     "## 作品集素材提醒",
 ]
 
-
-def env(name: str, default: str = "") -> str:
-    """读环境变量。注意：空字符串要视为未设置（Actions 未配 var 会传空值）。"""
-    # TODO 1: 实现
-    value = os.environ.get(name,"")
-    if not value:
-        return default
-    return value
+registry = ToolRegistry()
 
 
-# ---------------------------------------------------------------------------
-# TODO 1 · 后端解析（local / cloud / auto）
-# ---------------------------------------------------------------------------
-
-def resolve_backend(choice: str) -> dict:
-    """返回 {"name", "base_url", "model", "api_key"} 字典。
-
-    - local:  Ollama，默认 http://localhost:11434/v1 + qwen2.5:7b
-    - cloud:  OpenAI 兼容 API，必须配置 CLOUD_API_KEY，否则报错退出
-    - auto:   用 client.models.list() 带 3s 超时探测本地；不通则 fallback 云端
-    """
-    if choice == "local":
-        return {
-            "name": "local",
-            "base_url": env("LOCAL_BASE_URL", "http://localhost:11434/v1"),
-            "model": env("LOCAL_MODEL", "qwen2.5:7b"),
-            "api_key": "ollama",
-        }
-    if choice == "cloud":
-        key = env("CLOUD_API_KEY")
-        if not key:
-            print("key为空")
-            raise SystemExit(1)
-        return {
-            "name": "cloud",
-            "base_url": env("CLOUD_BASE_URL", "https://api.openai.com/v1"),
-            "model": env("CLOUD_MODEL", "gpt-4o-mini"),
-            "api_key": key,
-        }
-    if choice == "auto":
-        client = OpenAI(base_url=env("LOCAL_BASE_URL","http://localhost:11434/v1"),api_key ="ollama", timeout=3.0)
-        try:
-           client.models.list()
-           return resolve_backend("local")
-        except Exception:
-           return resolve_backend("cloud")
-    print(f"错误：未知后端 '{choice}'，可选 local / cloud / auto")
-    raise SystemExit(1)
-# ---------------------------------------------------------------------------
-# TODO 2 · Tool registry：错误作为数据返回，不许 raise
-# ---------------------------------------------------------------------------
-
-TOOL_REGISTRY = {}
-
-
-def register_tool(name: str, description: str):
-    """装饰器：把函数注册进 TOOL_REGISTRY（name -> {"impl": fn, "description": ...}）。"""
-    # 提示：和 Stage 4 的 @tool 一个思路，但这里给你自己的采集流水线用
-    def deco(fn):
-        TOOL_REGISTRY[name] = fn
-        return fn
-    return deco
-
-
-@register_tool("git_log", "读取仓库最近 N 天的 git 提交记录")
+@registry.register("git_log", "读取仓库最近 N 天的 git 提交记录")
 def get_git_log(days: int = 7) -> dict:
     """subprocess 跑 git log --since=<N天前> --pretty=%ad|%s --date=short，cwd=REPO_ROOT。
     失败返回 {"error":..., "retry_hint":...}（想想 Stage 3 的'错误是数据'）。"""
@@ -125,7 +65,7 @@ def get_git_log(days: int = 7) -> dict:
         return {"commits": commits, "count": len(commits)}
     except Exception as e:
         return {"error": f"错误原因{e}","retry_hint": "检查git命令是否正确"} 
-@register_tool("scan_stages", "扫描各 stage 目录，统计练习/笔记文件数量和最近修改时间")
+@registry.register("scan_stages", "扫描各 stage 目录，统计练习/笔记文件数量和最近修改时间")
 def scan_stages() -> dict:
     """遍历 REPO_ROOT.glob("stage*")，每个 stage 统计 .py/.md 文件数和最新 mtime。"""
     try:
@@ -147,7 +87,7 @@ def scan_stages() -> dict:
         return {"error": f"遇到错误原因为：{e}", "retry_hint": "确认仓库目录存在且文件可读"}
 
 
-@register_tool("read_pitfalls", "读取 LEARNING-ROUTE.md 中的踩坑记录清单")
+@registry.register("read_pitfalls", "读取 LEARNING-ROUTE.md 中的踩坑记录清单")
 def read_pitfalls() -> dict:
     """取 '## 4.' 到 '## 5.' 之间的数字开头的行。文档缺失/结构变了都要返回 error 数据。"""
     try:
@@ -165,7 +105,7 @@ def read_pitfalls() -> dict:
         return {"error": f"错误原因{e}", "retry_hint": "检查文件是否存在"}
 
 
-@register_tool("read_selfcheck", "读取 LEARNING-ROUTE.md 中的毕业自测清单")
+@registry.register("read_selfcheck", "读取 LEARNING-ROUTE.md 中的毕业自测清单")
 def read_selfcheck() -> dict:
     """取 '## 5.' 之后的 '- [' 开头的行。"""
     try:
@@ -181,7 +121,7 @@ def read_selfcheck() -> dict:
     except Exception as e:
         return {"error": f"错误原因：{e}", "retry_hint": "检查文件是否存在"}
 
-@register_tool("read_last_report", "读取最近一份复盘报告（跨 session 长期记忆）")
+@registry.register("read_last_report", "读取最近一份复盘报告（跨 session 长期记忆）")
 def read_last_report() -> dict:
     """glob('????-W??-review.md') 取最新一份，读前 3000 字符。没有则返回 {"memory": None}。"""
     try:
@@ -211,57 +151,6 @@ def collect_context(days: int, stats: list) -> dict:
     return context
 
 
-# ---------------------------------------------------------------------------
-# TODO 3 · LLM 调用包装（observability + cost）
-# ---------------------------------------------------------------------------
-
-@contextmanager
-def timed(label: str, stats: list):
-    """Stage 7 练习 3 的老朋友：计时 contextmanager，结束把 latency 写进 stats。"""
-    t0 = time.perf_counter()
-    try:
-        yield
-    finally:
-        elapsed = (time.perf_counter() - t0) * 1000
-        stats.append({"tool": label, "latency_ms": elapsed})
-
-
-
-
-def call_llm(client: OpenAI, cfg: dict, system: str, user: str, stats: list) -> tuple[str, dict]:
-    """调用 chat.completions，返回 (回复文本, {"input": n, "output": n})。
-    token 数从 resp.usage 里拿；把 tokens 也写进 stats。"""
-    with timed("call_llm", stats):
-        resp = client.chat.completions.create(
-            model = cfg["model"],
-            messages = [{"role": "system", "content":system},
-                        {"role": "user", "content":user}]
-        )
-        in_tokens = resp.usage.prompt_tokens
-        out_tokens = resp.usage.completion_tokens
-        stats.append({"tokens": {"input": in_tokens, "output": out_tokens}})
-        text = resp.choices[0].message.content
-        return text , {"input": in_tokens, "output": out_tokens}
-
-
-def estimate_cost(cfg: dict, tokens: dict) -> float | None:
-    """仅 cloud 后端且配置了 CLOUD_PRICE_IN/OUT（每百万 token 单价）才算，否则 None。"""
-    if cfg["name"] != "cloud":
-        return None
-    price_in = env("CLOUD_PRICE_IN")
-    price_out = env("CLOUD_PRICE_OUT")
-    if not price_in or not price_out:
-        return None
-    price_in = float(price_in)
-    price_out = float(price_out)
-    cost = (tokens["input"] * price_in + tokens["output"] * price_out) / 1_000_000
-    return cost
-
-
-
-# ---------------------------------------------------------------------------
-# TODO 4 · 报告生成（诚实性 system prompt + 带反馈重试）
-# ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = (
     "你是 kk 的学习复盘 agent，根据工具采集的真实数据写一份周度学习复盘报告（Markdown）。\n\n"
@@ -275,9 +164,7 @@ SYSTEM_PROMPT = (
 )
 
 
-def check_structure(report: str) -> list:
-    """返回缺失的标题列表（空列表 = 结构完整）。"""
-    return [h for h in SECTION_HEADERS if h not in report]
+
 
 
 def generate_report(client: OpenAI, cfg: dict, context: dict, stats: list) -> tuple[str, dict]:
@@ -290,7 +177,7 @@ def generate_report(client: OpenAI, cfg: dict, context: dict, stats: list) -> tu
 
     请根据这些数据写周报。"""
     report,tokens = call_llm(client, cfg, SYSTEM_PROMPT, user_prompt, stats)
-    missing = check_structure(report)
+    missing = check_structure(report, SECTION_HEADERS)
     if missing:
         retry_prompt = f"""你上次的输出缺少这些标题：{missing}
     请重新生成完整报告，必须包含全部4个标题。
@@ -314,11 +201,7 @@ def report_filename(now: datetime | None = None) -> str:
     return f"{iso.year}-W{iso.week:02d}-review.md"
 
 
-def append_run_log(entry: dict) -> None:
-    """把运行遥测追加写入 reports/run_log.jsonl（一行一个 JSON）。"""
-    REPORTS_DIR.mkdir(exist_ok = True)
-    with open(RUN_LOG_PATH, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
 
 
 # ---------------------------------------------------------------------------
@@ -348,7 +231,7 @@ def build_eval_cases() -> list:
         {
             "id": "structure",
             "context": collect_context(7,[]),
-            "check": lambda r: not check_structure(r),
+            "check": lambda r: not check_structure(r, SECTION_HEADERS),
         },
         {
             "id": "honesty",
@@ -385,12 +268,10 @@ def run_eval(client: OpenAI, cfg: dict) -> float:
     print(f"通过率: {pass_count}/{len(results)} ({pass_rate: .0%})")
     print("  注：demo_fail 应该挂才证明eval有效")
 
-    append_run_log({"event": "eval", "pass_rate": pass_rate, "results": results})
+    append_run_log({"event": "eval", "pass_rate": pass_rate, "results": results}, RUN_LOG_PATH)
     return pass_rate
 
-# ---------------------------------------------------------------------------
-# TODO 6 · 主流程
-# ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """argparse 解析参数 → resolve_backend → （--eval 则跑评估）→
@@ -427,7 +308,7 @@ def main() -> None:
         "tokens": tokens,
         "cost": cost,
         "stats": stats,
-    })
+    }, RUN_LOG_PATH)
 
     print(f"✅ 报告已生成：{report_path}")
     print(f"    tokens: {tokens['input']} in / {tokens['output']} out")
