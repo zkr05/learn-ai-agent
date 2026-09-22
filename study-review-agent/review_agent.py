@@ -296,6 +296,8 @@ def main() -> None:
 
     REPORTS_DIR.mkdir(exist_ok=True)
     report_path = REPORTS_DIR / report_filename()
+    if cfg["name"] != "cloud":
+        report_path = report_path.with_suffix(".local.md")
     report_path.write_text(report, encoding="utf-8")
 
     cost = estimate_cost(cfg, tokens)
