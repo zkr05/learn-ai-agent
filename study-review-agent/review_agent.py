@@ -32,6 +32,7 @@ from agent_kit import (env, resolve_backend, timed, call_llm,
 AGENT_DIR = Path(__file__).resolve().parent
 REPORTS_DIR = AGENT_DIR / "reports"
 RUN_LOG_PATH = REPORTS_DIR / "run_log.jsonl"
+LOCAL_RUN_LOG_PATH = REPORTS_DIR / "run_log.local.jsonl"
 
 CST = timezone(timedelta(hours=8))  # 北京时间
 MAX_TOKENS = 1500
@@ -201,12 +202,10 @@ def report_filename(now: datetime | None = None) -> str:
     return f"{iso.year}-W{iso.week:02d}-review.md"
 
 
+def run_log_path(cfg: dict) -> Path:
+    """云端运行写正式日志（入库），本地运行写本地日志（gitignore）。"""
+    return RUN_LOG_PATH if cfg["name"] == "cloud" else LOCAL_RUN_LOG_PATH
 
-
-
-# ---------------------------------------------------------------------------
-# TODO 5 · Eval harness（结构 / 诚实性 / 正确性 + 一个故意挂的用例）
-# ---------------------------------------------------------------------------
 
 def empty_context() -> dict:
     """所有工具返回空数据的上下文，测诚实性用。"""
@@ -268,7 +267,7 @@ def run_eval(client: OpenAI, cfg: dict) -> float:
     print(f"通过率: {pass_count}/{len(results)} ({pass_rate: .0%})")
     print("  注：demo_fail 应该挂才证明eval有效")
 
-    append_run_log({"event": "eval", "pass_rate": pass_rate, "results": results}, RUN_LOG_PATH)
+    append_run_log({"event": "eval", "pass_rate": pass_rate, "results": results}, run_log_path(cfg))
     return pass_rate
 
 
@@ -308,7 +307,8 @@ def main() -> None:
         "tokens": tokens,
         "cost": cost,
         "stats": stats,
-    }, RUN_LOG_PATH)
+    }, run_log_path(cfg))
+
 
     print(f"✅ 报告已生成：{report_path}")
     print(f"    tokens: {tokens['input']} in / {tokens['output']} out")
