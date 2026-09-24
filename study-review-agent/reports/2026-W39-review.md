@@ -1,29 +1,37 @@
 ## 本周学习进度回顾
 
-本周 13 次提交（2026-09-16～2026-09-21），主线是毕业设计逐日推进与 agent_kit 重构：
+本周（2026-09-22～2026-09-24）采集到 6 次提交（2026-09-21 及之前的提交已在上周报告中覆盖），git_log 累计 17 条记录：
 
-毕业设计第三天：tool registry 完成（5个采集工具 + collect_context + timed）；第四天：LLM调用包装 + token 记账；第五天：报告生成（prompt组装 + 结构校验 + 带反馈重试）；第六天：eval harness（4用例含故意挂的demo_fail）；第七天：main主流程（argparse + 端到端跑通）；第八天：Github Actions workflow(每周一自动跑)；workflow加入eval质量门禁(生成报告前先验证agent健康)；README:毕业设计标记为已完成(含action和实测数据)；chore: 周报 2026-09-18（两次）；重构：抽出agent_kit 通用模块（8个通用零件，review_agent减28%）；README: 补agent_kit 模块化说明 + 用run_log实测数据修正成本数字；chore: 周报 2026-09-21。
+- 2026-09-24|新增 reports MCP server: 3个只读工具（list/read/search）+ stdio端到端测试
+- 2026-09-24|修CI push 失败 (字面量\n) + MCP测试进CI + README 补 MCP server段落
+- 2026-09-24|新增排障笔记：MCP server 跨宿主排查（分层排除 + 边界插桩 + 交叉验证）
+- 2026-09-22|Merge branch 'master' of github.com:zkr05/learn-ai-agent
+- 2026-09-22|本地运行产物不入库：本地报告写 .local.md，正式报告只由云端生成
+- 2026-09-22|分离本地日志与云端日志，本地日志分离不提交
 
-stage 扫描：7 个阶段目录最新更新均为 2026-09-21，文件数最多为 stage3（12 py/3 md）。
+主线是 MCP server 落地：3 个只读工具 + stdio 端到端测试 + 测试进 CI，并沉淀了一篇跨宿主排查笔记；同时把本地/云端产物与日志分离，本地运行产物不入库。
+
+stage 扫描：7 个阶段目录最新更新均为 2026-09-24；文件数最多为 stage3-tool-use（12 py / 3 md）。
 
 ## 易错点/踩坑提取
 
 1. 推理模型吃 token：max_tokens 要给 500+，否则 content 为空
 2. 中文引号写进代码：字符串里别用 ASCII 引号当内容
-3. 模型抢跑：多步任务别列工具清单
-4. 模型漏步：3b 多步不稳，7b 更稳
-5. 工具输入不匹配（踩 3 次）：中英文别名/归一化对齐
-6. embedding 大小写敏感：ReAct≠React
-7. 模型改数字：工具返回 6.7 可能写成 6.7899，需校验
-8. 自己检查会自我称赞：验收要拆独立 agent
+3. 模型抢跑：多步任务别列工具清单，用"必须完成"短问题
+4. 模型漏步：3b 多步不稳，7b 更稳；生产换大模型或多跑
+5. 工具输入不匹配（踩 3 次）：工具和模型要对齐（中英文别名/归一化）
+6. embedding 大小写敏感：ReAct≠React，查询要规范化
+7. 模型改数字：工具返回 6.7 模型可能用 6.7899——数据要校验
+8. 自己检查会自我称赞：验收要拆独立 agent（Debate/Critic）
 9. .codex 有敏感文件：auth.json 不能提交
 
 ## 下周学习建议
 
-- 逐条对照 6 条自查清单：ReAct 循环＋3 个坑、RAG、agent eval 与通过率、MCP/Skill/AGENTS.md 区别、框架/手写/RAG/multi-agent 取舍、Harness 8 元件。
-- 优先补坑 5（已踩 3 次）与坑 7；坑 8 尝试拆独立验收 agent。
-- 按坑 9 确认 .codex/auth.json 等敏感文件未被提交。
-- stage1~7 本周均有更新，安排回扫。
+- 对照 6 条自查清单逐项过：ReAct 循环＋3 个坑、搭一个 RAG、给 agent 写 eval 并解释通过率、MCP/Skill/AGENTS.md 区别、框架/手写/RAG/multi-agent 取舍、Harness 8 元件。
+- 优先补坑 5（已踩 3 次）与坑 7 的数据校验；坑 8 尝试拆独立验收 agent。
+- 按坑 9 复查 .codex/auth.json 等敏感文件确实未进入提交。
+- 7 个 stage 本周均有更新，安排一次回扫，重点看 stage3（文件最多）。
+- 顺着 MCP 跨宿主排查笔记，把分层排除/边界插桩/交叉验证的方法复用到其他排障场景。
 
 ## 作品集素材提醒
 
