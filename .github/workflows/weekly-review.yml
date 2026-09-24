@@ -43,4 +43,17 @@ jobs:
           git add study-review-agent/reports/
           git diff --cached --quiet || git commit -m "chore: 周报 $(date +%F)"
           git pull --rebase origin master
-          git push \n
+          git push
+
+  mcp-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: 装依赖
+        run: pip install -r study-review-agent/requirements.txt
+      - name: 跑 MCP server 验收测试（stdio 端到端）
+        run: cd study-review-agent && python test_mcp_reports.py

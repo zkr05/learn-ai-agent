@@ -28,6 +28,29 @@ Harness 元件（全部亲手实现）：
 
 **运行实测**（数据来自 [`run_log.jsonl`](study-review-agent/reports/run_log.jsonl)）：累计 25 次运行记录（12 次 eval + 13 次报告）；本地后端 $0（单次约 1.8k input / 0.7k output），云端后端约 $0.008/次（约 1.9k / 1.6k，5 次合计 $0.038）。
 
+## 🔌 扩展：把周报接成 MCP server
+
+[`study-review-agent/mcp_reports_server.py`](study-review-agent/mcp_reports_server.py) 把 `reports/` **只读**暴露成 3 个 MCP 工具 —— 任何 MCP 客户端挂载后都能直接问"我最近两周的复盘说了什么"。
+
+| 工具 | 作用 | 设计要点 |
+|---|---|---|
+| `list_reports()` | 列出所有周报（周次/文件名/大小/修改日期） | 只给目录不给正文，让模型先知道"有哪些" |
+| `read_report(week)` | 读某一周正文 | 周次**归一化**（`W39` / `2026-w39` / `2026-W39-review.md` 都认）；找不到时 `retry_hint` 里**动态**列出可选周次 |
+| `search_reports(keyword, limit)` | 跨周报全文搜索，返回周次 + 行号 | 结果封顶但 `total` 仍是真实命中数（"封顶但不说谎"），避免 token 爆炸 |
+
+**四个工程决策**：
+
+- **只读** —— 无写文件、无 `subprocess`、无 `eval`。这是给外部 agent 调的 server，风险面压到最小
+- **路径不硬编码** —— `Path(__file__).resolve().parent / "reports"`。host 可能在任意 cwd 启动它，写死相对路径必然找不到
+- **`.local.md` 天然隔离** —— glob 模式 `????-W??-review.md` 不会匹配本地草稿，所以本地测试报告既不进列表，也不会被 agent 当成"上周报告"读进上下文
+- **无路径穿越** —— 周次被正则锁死成 `YYYY-Www` 格式，拼不出 `../`
+
+**验收**：[`test_mcp_reports.py`](study-review-agent/test_mcp_reports.py) 用 **stdio 端到端**（真起子进程、走真协议）跑 13 条断言。
+
+> ⚠️ 这里踩过一个值得记的坑：最初用 in-process `Client(mcp)` 测，**13 条断言全绿**，但作为真 server 根本起不来 —— 漏了 `if __name__ == "__main__": mcp.run()`，客户端一连就 `Connection closed`。**in-process 测试测的是"零件"，用户用的是"整机"**；改成 stdio 之后它当场抓到了这个 bug。同类教训还有一条：docstring 里 `Args:` 与摘要之间少一个空行，**参数说明会静默变成 `null`**（不报错、不崩），已把"参数说明不为空"写成断言防复犯。
+
+**已实测挂载**：WorkBuddy（MCP 客户端）+ `fastmcp call`（CLI 直调）。
+
 ## 技能清单
 
 ### Stage 0 — Python 基础 ✅
@@ -83,6 +106,7 @@ Harness 元件（全部亲手实现）：
 5. **成本敏感**：全路线用本机 Ollama $0 跑通，需要云端时先算 token 账
 6. **学习过程全部 git 留痕**，每个练习带自我验证（assert）和观察记录
 7. **会做重构**：毕业设计跑通后把通用 harness 抽成独立模块 `agent_kit.py`（8 个可复用零件）。关键动作是**参数化**——日志路径、报告标题、工具表都改成参数注入，否则通用模块会把业务信息硬编码进去；全程坚持「行为不变」原则，本地 / eval / 云端 / CI 四项验证全绿才提交（业务层代码减少 28%）
+8. **把能力接成 MCP server**：周报通过标准 MCP 协议暴露给任意客户端（已实测挂载 WorkBuddy）；并用 stdio 端到端测试抓出「in-process 测试全绿但真 server 起不来」的**测试盲区** —— 测试要测「用户怎么用它」，不是「零件对不对」
 
 ## 仓库结构
 
@@ -91,7 +115,7 @@ learn-ai-agent/
 ├── README.md                    # 本文件（作品集）
 ├── agent_kit.py                 # 可复用 harness：后端解析/计时/LLM记账/成本/遥测/工具注册/结构校验
 ├── LEARNING-ROUTE.md            # Stage 0-7 复习地图 + 代码模板 + 踩坑记录
-├── study-review-agent/          # 🏆 毕业设计：每周自动复盘 agent（GitHub Actions）
+├── study-review-agent/          # 🏆 毕业设计：每周自动复盘 agent + 周报 MCP server（GitHub Actions）
 ├── stage1-llm-basics/           # API 调用 / token / retry
 ├── stage2-prompt-eng/           # system / few-shot / CoT / refine
 ├── stage3-tool-use/             # 从零手写 ReAct agent
