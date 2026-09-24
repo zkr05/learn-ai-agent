@@ -51,6 +51,8 @@ Harness 元件（全部亲手实现）：
 
 **已实测挂载**：WorkBuddy（MCP 客户端）+ `fastmcp call`（CLI 直调）。
 
+> 📝 挂载到 Codex 时遇到过连不上的问题，完整的排障记录（读宿主 sqlite 日志 → 在边界插桩 → 换客户端交叉验证）见 [`notes/mcp-server-debugging.md`](notes/mcp-server-debugging.md)。
+
 ## 技能清单
 
 ### Stage 0 — Python 基础 ✅
