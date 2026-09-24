@@ -26,7 +26,7 @@ Harness 元件（全部亲手实现）：
 
 **代码分层**：通用 harness 已抽成 [`agent_kit.py`](agent_kit.py)（8 个可复用零件：后端解析 / 计时 / LLM 记账 / 成本核算 / 遥测日志 / 工具注册 / 结构校验），`review_agent.py` 只留学习复盘专属逻辑（441 → 318 行）。
 
-**运行实测**（数据来自 [`run_log.jsonl`](study-review-agent/reports/run_log.jsonl)）：累计 25 次运行记录（12 次 eval + 13 次报告）；本地后端 $0（单次约 1.8k input / 0.7k output），云端后端约 $0.008/次（约 1.9k / 1.6k，5 次合计 $0.038）。
+**运行实测**（数据来自 [`run_log.jsonl`](study-review-agent/reports/run_log.jsonl)）：累计 29 次运行记录（14 次 eval + 15 次报告）；本地后端 $0（单次约 1.8k in / 0.7k out），云端后端 **$0.007~$0.025/次**（6 次中位数 $0.010、合计 $0.074）。单次成本波动 2 倍以上，来源是**推理模型的思考长度不稳定**（output token 1.1k~5.8k），不是代码问题 —— **成本要按区间给，别给平均数**。
 
 ## 🔌 扩展：把周报接成 MCP server
 
