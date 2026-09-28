@@ -16,3 +16,6 @@ __pycache__/
 # 本地周报日志
 run_log.local.jsonl
 *.local.md
+
+# Pages 构建产物（派生文件，不入库）
+_site/
