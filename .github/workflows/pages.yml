@@ -1,0 +1,49 @@
+name: reports-site
+
+# 只在"报告 / 站点模板 / 构建脚本"变化时重新构建并部署
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'study-review-agent/reports/**'
+      - 'study-review-agent/site/**'
+      - 'study-review-agent/build_reports_site.py'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch: {}
+
+# GitHub Pages 部署需要的权限（官方要求：contents 读 + pages 写 + id-token 写）
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时刻只跑一个部署；新的进来就把旧的取消
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: 构建站点
+        run: python study-review-agent/build_reports_site.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: study-review-agent/_site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
