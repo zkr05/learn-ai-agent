@@ -18,7 +18,8 @@ SITE_DIR = AGENT_DIR / "site"
 OUT_DIR = AGENT_DIR / "_site"
 
 REPORTS_GLOB = "????-W??-review.md"      # 正式报告的模式（.local.md 天然被排除）
-
+# 注意：同一模式还硬编码在review_agent.py 和 mcp_reports_server.py:
+# 暂不收敛（变更概率低，仅3处）,若将来要改报告命名，先抽reports_layout.py
 
 def formal_reports() -> list[Path]:
     """正式报告文件，最新在前。"""
