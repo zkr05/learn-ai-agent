@@ -53,6 +53,19 @@ Harness 元件（全部亲手实现）：
 
 > 📝 挂载到 Codex 时遇到过连不上的问题，完整的排障记录（读宿主 sqlite 日志 → 在边界插桩 → 换客户端交叉验证）见 [`notes/mcp-server-debugging.md`](notes/mcp-server-debugging.md)。
 
+## 🌐 在线站点：周报静态网站
+
+**https://zkr05.github.io/learn-ai-agent/**
+
+每周定时任务生成报告 → bot 提交 → 自动触发站点重建 → 网站多出一期，**全流程零人工**。
+
+| 关注点 | 实现 |
+|---|---|
+| 构建 | `build_reports_site.py` 是**装配式**构建：读 `site/index.html`（外壳）+ `reports/*.md`（正文）→ 产出 `_site/`。**它一行 HTML 都不生成** —— 渲染交给浏览器里的 docsify（零构建依赖、单一数据源） |
+| 部署 | 独立的 `pages.yml`：build / deploy 两个 job（`needs` 依赖，构建失败就不发布）、最小权限（`contents: read` + `pages: write` + `id-token: write`）、`concurrency` 防止两个部署同时打架 |
+| 触发 | 改 `reports/` 或模板时自动构建。**注意：bot 推送不会触发其他 workflow**（GitHub 的 `GITHUB_TOKEN` 防递归规则），所以周报 workflow 末尾主动 `gh workflow run` 一次 |
+| 一个坑 | `.nojekyll` —— 不加的话 `_sidebar.md` 会被 Jekyll 吃掉（Jekyll 把 `_` 开头的文件当保留命名，一律不发布） |
+
 ## 技能清单
 
 ### Stage 0 — Python 基础 ✅
@@ -105,10 +118,12 @@ Harness 元件（全部亲手实现）：
 2. **eval 先行**：每个 agent 都有量化验收（通过率 + 故意挂的用例），不信"看起来能跑"
 3. **独立验收意识**：用 multi-agent 辩论做 Critic，避免自我称赞
 4. **9 条踩坑记录**沉淀成工程直觉（见 [LEARNING-ROUTE.md §4](LEARNING-ROUTE.md)）：推理模型吃 token、工具输入归一化、embedding 大小写敏感、模型改数字要校验……
+   - 另有 [`notes/mcp-server-debugging.md`](notes/mcp-server-debugging.md)：把踩过的坑**按「错误的性质」分类**（shell 转义 / 解析器格式要求 / 依赖会变的数据 / 平台隐式规则 / 测试盲区），并记录了**用变异测试衡量测试强度**的方法 —— 以及它第一次跑就暴露出自己测试盲区的过程
 5. **成本敏感**：全路线用本机 Ollama $0 跑通，需要云端时先算 token 账
 6. **学习过程全部 git 留痕**，每个练习带自我验证（assert）和观察记录
 7. **会做重构**：毕业设计跑通后把通用 harness 抽成独立模块 `agent_kit.py`（8 个可复用零件）。关键动作是**参数化**——日志路径、报告标题、工具表都改成参数注入，否则通用模块会把业务信息硬编码进去；全程坚持「行为不变」原则，本地 / eval / 云端 / CI 四项验证全绿才提交（业务层代码减少 28%）
 8. **把能力接成 MCP server**：周报通过标准 MCP 协议暴露给任意客户端（已实测挂载 WorkBuddy）；并用 stdio 端到端测试抓出「in-process 测试全绿但真 server 起不来」的**测试盲区** —— 测试要测「用户怎么用它」，不是「零件对不对」
+9. **会交付，不只是会写**：把周报接成 MCP server（跨客户端可用）、构建成静态站点自动部署（独立 workflow、最小权限、并发控制、`.nojekyll` 这类平台细节），形成「采集 → 生成 → 进版本库 → 自动发布」的完整闭环
 
 ## 仓库结构
 
@@ -117,7 +132,8 @@ learn-ai-agent/
 ├── README.md                    # 本文件（作品集）
 ├── agent_kit.py                 # 可复用 harness：后端解析/计时/LLM记账/成本/遥测/工具注册/结构校验
 ├── LEARNING-ROUTE.md            # Stage 0-7 复习地图 + 代码模板 + 踩坑记录
-├── study-review-agent/          # 🏆 毕业设计：每周自动复盘 agent + 周报 MCP server（GitHub Actions）
+├── notes/                       # 工程笔记（MCP 跨宿主排障记录等）
+├── study-review-agent/          # 🏆 毕业设计：每周自动复盘 agent + MCP server + 周报站点（GitHub Actions）
 ├── stage1-llm-basics/           # API 调用 / token / retry
 ├── stage2-prompt-eng/           # system / few-shot / CoT / refine
 ├── stage3-tool-use/             # 从零手写 ReAct agent

@@ -199,6 +199,11 @@ def report_filename(now: datetime | None = None) -> str:
     """按北京时间 isocalendar() 生成 '2026-W37-review.md' 这样的文件名。"""
     now = now or datetime.now(CST)
     iso = now.isocalendar()
+    # ⚠️ 这里是 "-review.md" 命名约定的唯一定义处，但另外几处代码都假设了它，改这里必须同步改：
+    #    read_last_report()（读的时候用 glob 匹配）
+    #    mcp_reports_server.py 的 REPORTS_GLOB / _week_of
+    #    build_reports_site.py 的 REPORTS_GLOB / week_of
+    #    （用符号名而不是行号来指位置 —— 行号会随编辑漂移）
     return f"{iso.year}-W{iso.week:02d}-review.md"
 
 
