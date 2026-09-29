@@ -1,14 +1,13 @@
 ## 本周学习进度回顾
 
-本周 git_log 采集到 11 条提交（2026-09-22～2026-09-28），其中 2026-09-28 新增 3 条：
+本周 git_log 采集到 13 条提交（2026-09-22～2026-09-29），较上一份报告（11 条）新增 2 条：
 
-- 2026-09-28|build_reports_site:标注REPORTS_GLOB的重复位置与收敛时机
-- 2026-09-28|新增GitHub Pages：周报自动构建静态站点并部署
-- 2026-09-28|提交pages.yaml,index.html
+- 2026-09-29|MCP测试改成fixture驱动：不再依赖LLM生成的周报内容（修CI误报）
+- 2026-09-28|chore: 周报 2026-09-28
 
-其余 8 条日期为 09-22～09-24（上一份报告已覆盖其中 6 条）。本周主线是把周报做成静态站点：接上 GitHub Pages 自动构建与部署，并标注 REPORTS_GLOB 的重复位置与收敛时机。
+其余 11 条日期为 09-22～09-28，上一份报告已覆盖。本周延续两条主线：一是周报静态站点（GitHub Pages 自动构建部署、pages.yaml/index.html、REPORTS_GLOB 收敛标注）；二是 MCP server 的测试与稳定性（3 个只读工具 list/read/search、stdio 端到端测试进 CI、修 CI push 失败、跨宿主排障笔记），并在 09-29 把 MCP 测试改为 fixture 驱动，解除对 LLM 生成内容的依赖以修 CI 误报。
 
-stage 扫描：7 个阶段目录最新更新均为 2026-09-28，合计 41 个 py、17 个 md；文件最多为 stage3-tool-use（12 py / 3 md），最少为 stage5-claude-code（1 py / 2 md）。
+stage 扫描：7 个阶段目录最新更新均为 2026-09-29，合计 41 个 py、17 个 md；文件最多为 stage3-tool-use（12 py / 3 md），最少为 stage5-claude-code（1 py / 2 md）。
 
 ## 易错点/踩坑提取
 
@@ -27,7 +26,7 @@ stage 扫描：7 个阶段目录最新更新均为 2026-09-28，合计 41 个 py
 - 对照 6 条自查清单逐项过：ReAct 循环＋3 个坑、搭 RAG（embed→retrieve→generate）、给 agent 写 eval 并解释通过率、MCP/Skill/AGENTS.md 区别、框架/手写/RAG/multi-agent 取舍、Harness 8 元件。
 - 优先补坑 5（已踩 3 次）与坑 7 的数据校验；坑 8 试着拆独立验收 agent。
 - 按坑 9 复查 .codex/auth.json 等敏感文件确未进入提交。
-- 7 个 stage 本周均有更新，安排一次回扫；站点部署刚落地，可核对 REPORTS_GLOB 收敛后是否仍只有单一来源。
+- 7 个 stage 本周均有更新（最新 09-29），安排一次回扫；站点部署与 MCP 测试均已落地，可核对 REPORTS_GLOB 收敛后是否仍只有单一来源、fixture 驱动后 CI 是否稳定不再误报。
 
 ## 作品集素材提醒
 
