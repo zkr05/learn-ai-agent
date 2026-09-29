@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: write      # 需要它才能在最后触发站点重建（workflow_dispatch）
 
 jobs:
   review:
@@ -44,6 +45,13 @@ jobs:
           git diff --cached --quiet || git commit -m "chore: 周报 $(date +%F)"
           git pull --rebase origin master
           git push
+
+      - name: 触发站点重建
+        # bot 用 GITHUB_TOKEN 推送，不会触发其他 workflow（GitHub 防递归规则），
+        # 所以这里用 workflow_dispatch 主动触发 —— 它是那条规则的两个例外之一。
+        run: gh workflow run pages.yml --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   mcp-test:
     runs-on: ubuntu-latest
