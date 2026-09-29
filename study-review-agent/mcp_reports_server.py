@@ -5,6 +5,7 @@ import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -14,7 +15,9 @@ from fastmcp import FastMCP
 
 
 
-REPORTS_DIR = Path(__file__).resolve().parent / "reports"
+_DEFAULT_REPORTS_DIR = Path(__file__).resolve().parent / "reports"
+# 报告目录可被环境变量覆盖（测试用来指向临时 fixture 目录）；不设则用默认目录
+REPORTS_DIR = Path(os.environ.get("STUDY_REPORTS_DIR") or _DEFAULT_REPORTS_DIR)
 REPORTS_GLOB = "????-W??-review.md"
 
 
