@@ -275,28 +275,27 @@ def run_eval(client: OpenAI, cfg: dict) -> float:
     append_run_log({"event": "eval", "pass_rate": pass_rate, "results": results}, run_log_path(cfg))
     return pass_rate
 
+def run_once(backend: str = "auto", days: int = 7) -> dict:
+    """跑一次完整流程：采集数据 → 生成报告 → 写文件 → 写遥测日志。
 
+    命令行和 HTTP 层都调这个函数，让「跑一次」的逻辑只有一份。
 
-def main() -> None:
-    """argparse 解析参数 → resolve_backend → （--eval 则跑评估）→
-    collect_context → generate_report → 写 reports/YYYY-WNN-review.md →
-    打印 ✅ 报告路径 + tokens/成本统计 → 遥测写入 run_log.jsonl。"""
-    parser = argparse.ArgumentParser(description = "每周学习复盘agent")
-    parser.add_argument("--backend", default="auto", choices=["local","cloud","auto"],
-                        help="模型后端")
-    parser.add_argument("--days", type=int, default=7,help="复盘最近N天")
-    parser.add_argument("--eval", action="store_true",help="只跑eval harness")
+    Args:
+        backend: 模型后端，可选 local / cloud / auto。
+        days: 复盘最近多少天的数据。
 
-    args = parser.parse_args()
-    cfg = resolve_backend(args.backend)
+    Returns:
+        结果摘要字典，含五个键：
+            backend: 实际使用的后端名（local / cloud）
+            file: 生成的报告文件名
+            tokens: token 用量，本身是含 input / output 两个键的字典
+            cost: 云端调用成本；本地后端为 None
+            stats: 各阶段耗时与 token 的明细列表
+    """
+    cfg = resolve_backend(backend)
     client = OpenAI(base_url=cfg["base_url"], api_key=cfg["api_key"])
-
-    if args.eval:
-        run_eval(client,cfg)
-        return
-    
     stats = []
-    context = collect_context(args.days, stats)
+    context = collect_context(days, stats)
     report, tokens = generate_report(client, cfg, context, stats)
 
     REPORTS_DIR.mkdir(exist_ok=True)
@@ -309,17 +308,44 @@ def main() -> None:
     append_run_log({
         "event": "report",
         "file": report_path.name,
-        "days": args.days,
+        "days": days,
         "backend": cfg["name"],
         "tokens": tokens,
         "cost": cost,
         "stats": stats,
     }, run_log_path(cfg))
+    return {
+        "backend": cfg["name"],
+        "file": report_path.name,
+        "tokens": tokens,
+        "cost": cost,
+        "stats": stats,
+    }
 
 
-    print(f"✅ 报告已生成：{report_path}")
-    print(f"    tokens: {tokens['input']} in / {tokens['output']} out")
-    print(f"   成本：{cost if cost is not None else '$0 (本地)'}")
+def main() -> None:
+    """命令行入口：解析参数 → 若 --eval 则只跑评估 harness；
+
+    否则调 run_once() 跑一次完整流程，并打印报告文件名、token 用量与成本。
+    真正的业务逻辑在 run_once() 里，本函数只负责解析参数和展示结果。"""
+    parser = argparse.ArgumentParser(description = "每周学习复盘agent")
+    parser.add_argument("--backend", default="auto", choices=["local","cloud","auto"],
+                        help="模型后端")
+    parser.add_argument("--days", type=int, default=7,help="复盘最近N天")
+    parser.add_argument("--eval", action="store_true",help="只跑eval harness")
+
+    args = parser.parse_args()
+
+    if args.eval:
+        cfg = resolve_backend(args.backend)
+        client = OpenAI(base_url=cfg["base_url"], api_key=cfg["api_key"])
+        run_eval(client,cfg)
+        return
+
+    result = run_once(args.backend, args.days)
+    print(f"✅ 报告已生成：{result['file']}")
+    print(f"token 用量：{result['tokens']['input']} in / {result['tokens']['output']} out")
+    print(f"成本用量：{result['cost'] if result['cost'] is not None else '$0 (本地)'}")
 
 if __name__ == "__main__":
     main()
