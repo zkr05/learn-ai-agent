@@ -12,23 +12,11 @@ from pathlib import Path
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+from reports_store import report_files, week_of
+
 AGENT_DIR = Path(__file__).resolve().parent
-REPORTS_DIR = AGENT_DIR / "reports"
 SITE_DIR = AGENT_DIR / "site"
 OUT_DIR = AGENT_DIR / "_site"
-
-REPORTS_GLOB = "????-W??-review.md"      # 正式报告的模式（.local.md 天然被排除）
-# 注意：同一模式还硬编码在review_agent.py 和 mcp_reports_server.py:
-# 暂不收敛（变更概率低，仅3处）,若将来要改报告命名，先抽reports_layout.py
-
-def formal_reports() -> list[Path]:
-    """正式报告文件，最新在前。"""
-    return sorted(REPORTS_DIR.glob(REPORTS_GLOB), reverse=True)
-
-
-def week_of(path: Path) -> str:
-    """'2026-W39-review.md' -> '2026-W39'"""
-    return path.name.removesuffix("-review.md")
 
 
 def build() -> None:
@@ -43,7 +31,7 @@ def build() -> None:
     (OUT_DIR / ".nojekyll").write_text("", encoding="utf-8")
 
     # 4) 报告正文：复制进发布目录
-    reports = formal_reports()
+    reports = sorted(report_files(), reverse=True)
     dest = OUT_DIR / "reports"
     dest.mkdir(parents=True, exist_ok=True)
     for path in reports:

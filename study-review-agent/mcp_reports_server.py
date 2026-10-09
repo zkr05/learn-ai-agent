@@ -5,67 +5,24 @@ import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-import os
-import re
 from datetime import datetime
-from pathlib import Path
 
 from fastmcp import FastMCP
 
-
-
-
-_DEFAULT_REPORTS_DIR = Path(__file__).resolve().parent / "reports"
-# 报告目录可被环境变量覆盖（测试用来指向临时 fixture 目录）；不设则用默认目录
-REPORTS_DIR = Path(os.environ.get("STUDY_REPORTS_DIR") or _DEFAULT_REPORTS_DIR)
-REPORTS_GLOB = "????-W??-review.md"
-
+from reports_store import (available_weeks, normalize_week, read_report_text,
+                           report_files, week_of)
 
 mcp = FastMCP("study-reports")
-
-
-def _report_files() -> list[Path]:
-    """正式报告文件列表，按周次排序"""
-    return sorted(REPORTS_DIR.glob(REPORTS_GLOB))
-
-
-def _week_of(path: Path) -> str:
-    """'2026-W39-review.md' -> '2026-W39'"""
-    return path.name.removesuffix("-review.md")
-
-
-def _available_weeks() -> list[str]:
-    return [_week_of(p) for p in _report_files()]
-
-
-def _normalize_week(raw: str) -> str | None:
-    s = raw.strip().upper()
-    s = s.removesuffix("-REVIEW.MD")
-    m = re.fullmatch(r"(\d{4})-W(\d{1,2})", s)
-    if m:
-        year, week = m.group(1), m.group(2)
-    else:
-        m2 = re.fullmatch(r"W(\d{1,2})", s)
-        if not m2:
-            return None
-        year, week = None, m2.group(1)
-    if year is None:
-        weeks = _available_weeks()
-        if not weeks:
-            return None
-        year = max(w[:4] for w in weeks)
-    return f"{year}-W{int(week):02d}"
-
 
 
 @mcp.tool
 def list_reports() -> dict:
     """列出所有周报的目录信息（周次、文件名、大小、修改日期），不返回正文。"""
     reports = []
-    for f in _report_files():
+    for f in report_files():
         stat = f.stat()
         reports.append({
-            "week": _week_of(f),
+            "week": week_of(f),
             "file": f.name,
             "size_bytes": stat.st_size,
             "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d"),
@@ -78,19 +35,20 @@ def list_reports() -> dict:
 @mcp.tool
 def read_report(week: str) -> dict:
     """阅读指定周报的正文。
-    
+
     Args:
         week: 周次，形如2026-W39
     """
-    w = _normalize_week(week)
+
+    w = normalize_week(week)
     if w is None:
         return {"error": f"无法识别的周次：{week}", "retry_hint": "请用 2026-W39 这样的格式"}
 
-    path = REPORTS_DIR / f"{w}-review.md"
-    if not path.exists():
-        return {"error": f"没有{w}的周报", "retry_hint": f"可选周次: {_available_weeks()}"}
 
-    return {"week": w, "content": path.read_text(encoding="utf-8")}
+    content = read_report_text(w)
+    if content is None:
+        return {"error": f"没有{w}的周报", "retry_hint": f"可选周次: {available_weeks()}"}
+    return {"week": w, "content": content}
 
 
 @mcp.tool
@@ -107,18 +65,19 @@ def search_reports(keyword: str, limit: int = 30) -> dict:
 
     matches = []
     total = 0
-    for f in _report_files():
+    for f in report_files():
         lines = f.read_text(encoding="utf-8").splitlines()
         for lineno, line in enumerate(lines, 1):
             if kw in line.lower():
                 total += 1
                 if len(matches) < limit:
                     matches.append({
-                        "week": _week_of(f),
+                        "week": week_of(f),
                         "line": lineno,
                         "text": line.strip(),
                     })
     return {"matches": matches, "total": total, "truncated": total > len(matches)}
+
 
 if __name__ == "__main__":
     mcp.run()

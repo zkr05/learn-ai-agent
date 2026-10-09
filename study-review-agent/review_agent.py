@@ -16,7 +16,7 @@ import sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-import argparse  
+import argparse
 import json
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -29,8 +29,8 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from agent_kit import (env, resolve_backend, timed, call_llm,
                        estimate_cost, append_run_log, check_structure, ToolRegistry)
-AGENT_DIR = Path(__file__).resolve().parent
-REPORTS_DIR = AGENT_DIR / "reports"
+from reports_store import REPORTS_DIR, report_files
+
 RUN_LOG_PATH = REPORTS_DIR / "run_log.jsonl"
 LOCAL_RUN_LOG_PATH = REPORTS_DIR / "run_log.local.jsonl"
 
@@ -65,7 +65,7 @@ def get_git_log(days: int = 7) -> dict:
         commits = [line for line in result.stdout.strip().splitlines() if line]
         return {"commits": commits, "count": len(commits)}
     except Exception as e:
-        return {"error": f"错误原因{e}","retry_hint": "检查git命令是否正确"} 
+        return {"error": f"错误原因{e}","retry_hint": "检查git命令是否正确"}
 @registry.register("scan_stages", "扫描各 stage 目录，统计练习/笔记文件数量和最近修改时间")
 def scan_stages() -> dict:
     """遍历 REPO_ROOT.glob("stage*")，每个 stage 统计 .py/.md 文件数和最新 mtime。"""
@@ -124,12 +124,12 @@ def read_selfcheck() -> dict:
 
 @registry.register("read_last_report", "读取最近一份复盘报告（跨 session 长期记忆）")
 def read_last_report() -> dict:
-    """glob('????-W??-review.md') 取最新一份，读前 3000 字符。没有则返回 {"memory": None}。"""
+    """取最新一份报告，读前 3000 字符。没有则返回 {"memory": None}。"""
     try:
-        files = list(REPORTS_DIR.glob("????-W??-review.md"))
+        files = report_files()
         if not files:
             return {"memory": None}
-        latest = sorted(files)[-1]
+        latest = files[-1]
         content = latest.read_text(encoding="utf-8")[:3000]
         return {"memory": content, "file": latest.name}
     except Exception as e:
@@ -182,7 +182,7 @@ def generate_report(client: OpenAI, cfg: dict, context: dict, stats: list) -> tu
     if missing:
         retry_prompt = f"""你上次的输出缺少这些标题：{missing}
     请重新生成完整报告，必须包含全部4个标题。
-    
+
     原始数据：
     {data_text}"""
 

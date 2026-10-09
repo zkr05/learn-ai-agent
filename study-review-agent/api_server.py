@@ -19,10 +19,14 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-from fastapi import FastAPI
-from pydantic import BaseModel, Field
+from datetime import datetime
 from typing import Literal
 
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+
+from reports_store import (available_weeks, normalize_week, read_report_text,
+                           report_files, week_of)
 from review_agent import run_once
 
 app = FastAPI(title="study-review agent API", version="0.1")
@@ -58,9 +62,46 @@ def create_report(req: ReportRequest) -> dict:
     return result
 
 
-# ---------------------------------------------------------------- 今日清单
-# [ ] 1. 把 review_agent.py 里 main() 那段抽成 run_once(backend, days) -> dict
-# [ ] 2. 跑 python review_agent.py --backend local 确认行为不变
-# [ ] 3. 补完上面三个 TODO
-# [ ] 4. uvicorn api_server:app --reload --port 8000 起服务
-# [ ] 5. 浏览器打开 http://127.0.0.1:8000/docs 点着试
+@app.get("/reports")
+def list_reports() -> dict:
+    """列出所有周报的目录信息（周次、文件名、大小、修改日期），不返回正文。
+
+    只想看某一周的正文，用 GET /reports/{week}。
+    """
+    reports = []
+    for f in report_files():
+        stat = f.stat()
+        reports.append({
+            "week": week_of(f),
+            "file": f.name,
+            "size_bytes": stat.st_size,
+            "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d"),
+        })
+    return {"reports": reports}
+
+
+@app.get("/reports/{week}")
+def read_report(week: str) -> dict:
+    """读取指定周次的周报正文。
+
+    Args:
+        week: 周次，形如 2026-W39（也接受 W39 / 2026-w39 等写法）。
+    """
+    w = normalize_week(week)
+    if w is None:
+        # 400：参数本身不合法 —— 客户端该改格式
+        raise HTTPException(
+            status_code=400,
+            detail=f"无法识别的周次：{week}。请用 2026-W39 这样的格式。",
+        )
+
+    content = read_report_text(w)
+    if content is None:
+        # 404：参数合法，但服务器上确实没有这个资源
+        raise HTTPException(
+            status_code=404,
+            detail=f"没有 {w} 的周报。可选周次: {available_weeks()}",
+        )
+
+    return {"week": w, "content": content}
+
