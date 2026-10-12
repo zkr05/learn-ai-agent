@@ -9,6 +9,7 @@
 """
 
 import sys
+import uuid
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -22,7 +23,7 @@ if str(HERE) not in sys.path:
 from datetime import datetime
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from reports_store import (available_weeks, normalize_week, read_report_text,
@@ -52,14 +53,62 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-@app.post("/report")
-def create_report(req: ReportRequest) -> dict:
-    """跑一次复盘，生成报告，返回结果摘要。
+# ---------------------------------------------------------------- 后台任务
+# 任务表：进程内的内存字典。
+# 它的寿命 == 进程的寿命 —— 服务一重启，所有任务记录就没了。这就是要用 Celery/Redis 的原因。
+TASKS: dict[str, dict] = {}
 
-    注意：这一步要调 LLM（本地后端约 20 秒），Day 3 会改成后台任务。
+# 状态流转：pending（已登记）-> running（正在跑）-> done / error
+
+
+def _run_report_task(task_id: str, backend: str, days: int) -> None:
+    """真正干活的地方：跑一次复盘，把结果写回 TASKS。
+
+    注意：这是**同步函数**（def）。run_once 里全是阻塞调用（OpenAI 同步客户端 + git 子进程），
+         所以要让 FastAPI 把它丢进线程池。写成 async def 会堵死整个事件循环。
     """
-    result = run_once(backend=req.backend, days=req.days)
-    return result
+    TASKS[task_id]["status"] = "running"
+    try:
+        result = run_once(backend=backend, days=days)
+        TASKS[task_id].update(status="done", result=result)
+    except Exception as e:
+        # 后台线程抛出的异常不会进任何响应体 —— 不捕获的话客户端只会永远看到 running，
+        # 只留一行 traceback 在控制台，这就是「静默失败」。所以异常也要当成数据存下来。
+        TASKS[task_id].update(status="error", error=f"{type(e).__name__}: {e}")
+
+
+@app.post("/report", status_code=202)
+def create_report(req: ReportRequest, background: BackgroundTasks) -> dict:
+    """登记一次复盘任务，**立刻**返回 202；进度用 GET /tasks/{task_id} 查。
+
+    为什么是 202：HTTP 语义 =「请求我收到了，但还没做完」。
+    和 200 的区别 —— 200 意味着内容已经躺在响应体里了。
+    """
+    task_id = uuid.uuid4().hex[:8]
+    # 先登记、再丢后台。反过来的话，客户端可能在任务还没登记时就拿 id 来查，查不到。
+    TASKS[task_id] = {
+        "task_id": task_id,
+        "status": "pending",
+        "backend": req.backend,
+        "days": req.days,
+        "result": None,
+        "error": None,
+    }
+    background.add_task(_run_report_task, task_id, req.backend, req.days)
+    return {"task_id": task_id, "status": "pending", "poll": f"/tasks/{task_id}"}
+
+
+@app.get("/tasks/{task_id}")
+def read_task(task_id: str) -> dict:
+    """查询后台任务的状态和结果。"""
+    task = TASKS.get(task_id)
+    if task is None:
+        # 404：服务重启过、或者 id 本来就拼错了
+        raise HTTPException(
+            status_code=404,
+            detail=f"没有 {task_id} 这个任务（任务表在服务重启后会清空）",
+        )
+    return task
 
 
 @app.get("/reports")
