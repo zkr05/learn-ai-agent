@@ -1,0 +1,32 @@
+# docker-compose.yml —— 「怎么跑这个镜像」
+# Dockerfile 回答「怎么构建」，compose 回答「怎么运行」：
+# 端口映射、环境变量、挂载哪些目录、以后要不要加第二个容器（比如 Ollama）。
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # 端口映射：格式是 "宿主机端口:容器端口"。
+    # 这里两边都写 8000 —— 左边是你浏览器访问的端口，右边是容器里 uvicorn 监听的端口（= EXPOSE 那个）。
+    ports:
+      - "8000:8000"
+
+    environment:
+      REVIEW_BACKEND: ${REVIEW_BACKEND:-local}
+      # 关键：容器里的 localhost 指的是**容器自己**，连不到宿主机的 Ollama。
+      # host.docker.internal 是 Docker 提供的一个特殊域名，指向宿主机。
+      LOCAL_BASE_URL: ${LOCAL_BASE_URL:-http://host.docker.internal:11434/v1}
+      CLOUD_API_KEY: ${CLOUD_API_KEY:-}
+
+    # Linux 服务器上还需要下面两行才能解析 host.docker.internal
+    # （Windows / macOS 的 Docker Desktop 自带，所以先注释掉）：
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+
+    # 报告持久化：容器删了重建，reports/ 里的周报不能跟着没。
+    volumes:
+      - ./study-review-agent/reports:/app/study-review-agent/reports
+
+    restart: unless-stopped

@@ -1,0 +1,40 @@
+# .dockerignore —— 告诉 Docker「构建上下文里哪些文件不要拷进镜像」
+#
+# 为什么这个文件很重要（实测数据）：
+#   仓库根 = 206.31 MB，其中 awesome-agentic-ai-zh 单独占 205.39 MB（它的 .git pack 就 112 MB）。
+#   实测（docker build 的 "load build context" 那一行）：
+#     有本文件       -> 传递 53.31 kB
+#     注释掉下面那行 -> 传递 205.55 MB（耗时 9 秒）
+#   差了约 4000 倍。
+#
+# 两条不显然的决定：
+#   1. **不要**排除 .git —— 你自己的 .git 只有 0.5 MB，而 review_agent 的 git_log 工具
+#      要靠 `git log` 读提交历史（subprocess + cwd=REPO_ROOT）。排掉了它，容器里就查不到提交。
+#   2. **必须**排除 awesome-agentic-ai-zh —— 它是上游参考仓库，服务运行完全不需要它。
+
+# 构建上下文里确定不需要的东西
+awesome-agentic-ai-zh/
+.workbuddy/
+.codex/
+.vscode/
+.github/
+
+# Python 产物 / 本地环境
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Pages 构建产物（派生文件，可随时重建）
+_site/
+node_modules/
+
+# 本地运行产物（会被 Dockerfile 的 COPY 带进去，但没意义）
+*.local.md
+run_log.local.jsonl
+*.part
+*.tmp
+
+# 密钥 —— 绝对不能进镜像（镜像会被 push 到 registry）
+.env
+.env.*
