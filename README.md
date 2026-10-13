@@ -26,7 +26,7 @@ Harness 元件（全部亲手实现）：
 
 **代码分层**：通用 harness 已抽成 [`agent_kit.py`](agent_kit.py)（8 个可复用零件：后端解析 / 计时 / LLM 记账 / 成本核算 / 遥测日志 / 工具注册 / 结构校验），`review_agent.py` 只留学习复盘专属逻辑（441 → 318 行）。
 
-**运行实测**（数据来自 [`run_log.jsonl`](study-review-agent/reports/run_log.jsonl)）：累计 29 次运行记录（14 次 eval + 15 次报告）；本地后端 $0（单次约 1.8k in / 0.7k out），云端后端 **$0.007~$0.025/次**（6 次中位数 $0.010、合计 $0.074）。单次成本波动 2 倍以上，来源是**推理模型的思考长度不稳定**（output token 1.1k~5.8k），不是代码问题 —— **成本要按区间给，别给平均数**。
+**运行实测**（数据来自 [`run_log.jsonl`](study-review-agent/reports/run_log.jsonl)）：累计 **39 次运行记录**（19 次 eval + 20 次报告）；本地后端 $0，云端后端 **$0.001~$0.027/次**（12 次计费运行合计 $0.134、中位数 $0.009）。单次成本波动 **27 倍**，来源是**推理模型的思考长度不稳定**（output token 662~6195），不是代码问题 —— **成本要按区间给，别给平均数**。
 
 ## 🔌 扩展：把周报接成 MCP server
 
@@ -52,6 +52,37 @@ Harness 元件（全部亲手实现）：
 **已实测挂载**：WorkBuddy（MCP 客户端）+ `fastmcp call`（CLI 直调）。
 
 > 📝 挂载到 Codex 时遇到过连不上的问题，完整的排障记录（读宿主 sqlite 日志 → 在边界插桩 → 换客户端交叉验证）见 [`notes/mcp-server-debugging.md`](notes/mcp-server-debugging.md)。
+
+## 🧩 服务化：HTTP 接口层 + 容器化
+
+CLI 只能人手动跑，MCP 只能给 MCP 客户端用。为了让**任何**程序都能触发和读取复盘，加了一层 HTTP 服务（[`api_server.py`](study-review-agent/api_server.py)），并把整套东西容器化 —— 四天施工记录与实测数字见 [`HTTP-PLAN.md`](study-review-agent/HTTP-PLAN.md)。
+
+**同一个核心、多个适配器**：CLI / MCP / HTTP 共用一套业务逻辑，接口层自己**一条业务规则都没有**。分层是显式的：
+
+| 层 | 文件 | 职责 |
+|---|---|---|
+| 接口层 | `api_server.py` / `mcp_reports_server.py` / `main()` | 把外部请求翻译成一次函数调用，再把结果翻译回外部语义（状态码 / JSON / 退出码） |
+| 共享数据层 | `reports_store.py` | 报告在哪、叫什么名、怎么读 —— 三个上层共用（原本 4 处重复硬编码收敛为 1 处） |
+| 业务层 | `review_agent.run_once()` | 采集 -> 生成 -> 落盘 |
+| 核心层 | `agent_kit.py` | 后端解析 / 计时 / 记账 / 工具注册 |
+
+判断一个文件属于哪层：**看它 import 了什么**。`api_server.py` 只 import 了 `reports_store` 和 `run_once`，自己没有业务规则 —— 所以它是接口层。
+
+| 关键设计 | 为什么这么做 |
+|---|---|
+| `POST /report` 返回 **202 + task_id**，用 `GET /tasks/{id}` 轮询 | 一次复盘要跑 30 秒。同步接口会撞客户端和网关的超时，请求一断钱还白花。「登记 -> 后台跑 -> 轮询」之后**响应时间与任务耗时解耦** |
+| 后台函数写 `def` 而不是 `async def` | `run_once` 里全是阻塞调用（同步 HTTP 客户端 + `git` 子进程），必须交给线程池；写成 `async` 会堵死整个事件循环 |
+| 后台异常**捕获成数据**写回任务表 | 后台线程抛的异常不进任何响应体 —— 不捕获的话客户端只会永远看到 `running`（静默故障，和 Stage 3 的「错误是数据」是同一条原则） |
+| `GET /reports/{week}` 区分 400 / 404 | 400 = 参数格式不合法（客户端该改）；404 = 格式对但服务器没有（资源不存在）。周次还做**归一化**：`2026-W41` / `W41` 都认 |
+
+**实测数字**（全部真跑，不是估算）：`POST /report` 响应 **~20 秒 -> 23 ms**；构建上下文 **206 MB -> 53 kB**（`.dockerignore` 排掉 205 MB 的上游参考仓库）；镜像 **523 MB**；`docker compose up` 后 `/health` `/reports` 全通，容器 -> 宿主 Ollama 端到端跑出真实周报并落盘。
+
+**容器化踩到的两个「只有真跑才暴露」的 bug**（当时静态检查全绿）：
+
+1. `python:3.11-slim` 里**没有 `git`**，而 `git_log` 工具要 `subprocess` 跑 `git log` —— 静态检查在结构上看不出「缺一个系统二进制」
+2. 本机代理（fake-ip 模式）把 `deb.debian.org` 解析成假地址：apt 走 http 得到 **502**、换 https 得到 **SSL EOF**，而 pip 走 443 却是通的 —— 症状自相矛盾，**代理会让「网络问题」伪装成「镜像问题」**
+
+**已知缺陷（面试会问，自己先想清楚）**：`TASKS` 只增不减（内存泄漏）；任务表在内存里，进程重启就丢（要可靠得 Celery + Redis）；后台任务**没有并发上限**（10 个请求就真跑 10 次 LLM，成本失控）；**没有鉴权**（任何人都能烧钱）。
 
 ## 🌐 在线站点：周报静态网站
 
@@ -124,6 +155,8 @@ Harness 元件（全部亲手实现）：
 7. **会做重构**：毕业设计跑通后把通用 harness 抽成独立模块 `agent_kit.py`（8 个可复用零件）。关键动作是**参数化**——日志路径、报告标题、工具表都改成参数注入，否则通用模块会把业务信息硬编码进去；全程坚持「行为不变」原则，本地 / eval / 云端 / CI 四项验证全绿才提交（业务层代码减少 28%）
 8. **把能力接成 MCP server**：周报通过标准 MCP 协议暴露给任意客户端（已实测挂载 WorkBuddy）；并用 stdio 端到端测试抓出「in-process 测试全绿但真 server 起不来」的**测试盲区** —— 测试要测「用户怎么用它」，不是「零件对不对」
 9. **会交付，不只是会写**：把周报接成 MCP server（跨客户端可用）、构建成静态站点自动部署（独立 workflow、最小权限、并发控制、`.nojekyll` 这类平台细节），形成「采集 → 生成 → 进版本库 → 自动发布」的完整闭环
+10. **会做服务化和分层重构**：抽出 `run_once()` 与共享模块 `reports_store.py`（4 处重复硬编码收敛为 1 处），并显式分出接口层 / 共享数据层 / 业务层 / 核心层 —— 接口层不含任何业务规则，所以后来加 HTTP 入口时业务层一行未改。抽 `run_once()` 时用「`--eval` 通过率 + 本地后端 + MCP 端到端 + CI」四项验证确认行为不变才提交
+11. **会容器化，而且只为真跑过的结果背书**：Dockerfile 分层（依赖在前、代码在后）吃到构建缓存；`.dockerignore` 把构建上下文从 206 MB 压到 53 kB；compose 管端口、环境变量和报告目录的持久化挂载。上面两个 bug 都是「静态检查全绿但真跑就炸」，改完重跑才提交 —— 这也反过来说明：**「应该能跑」不是结论，是猜测**
 
 ## 仓库结构
 
@@ -132,8 +165,11 @@ learn-ai-agent/
 ├── README.md                    # 本文件（作品集）
 ├── agent_kit.py                 # 可复用 harness：后端解析/计时/LLM记账/成本/遥测/工具注册/结构校验
 ├── LEARNING-ROUTE.md            # Stage 0-7 复习地图 + 代码模板 + 踩坑记录
+├── Dockerfile                   # 容器镜像配方：分层缓存 / 装 git / exec 形式 CMD
+├── docker-compose.yml           # 运行编排：端口映射 / 环境变量 / 报告目录持久化挂载
+├── .dockerignore                # 构建上下文 206MB -> 53kB
 ├── notes/                       # 工程笔记（MCP 跨宿主排障记录等）
-├── study-review-agent/          # 🏆 毕业设计：每周自动复盘 agent + MCP server + 周报站点（GitHub Actions）
+├── study-review-agent/          # 🏆 毕业设计：自动复盘 agent + HTTP 服务层 + MCP server + 周报站点
 ├── stage1-llm-basics/           # API 调用 / token / retry
 ├── stage2-prompt-eng/           # system / few-shot / CoT / refine
 ├── stage3-tool-use/             # 从零手写 ReAct agent
@@ -149,3 +185,4 @@ learn-ai-agent/
 - Python 3.11+ · openai SDK · FastMCP
 - 本机模型：Ollama（qwen2.5:7b + bge-m3 embedding）
 - 云端：任意 OpenAI 兼容 API（复盘 agent 可配置切换）
+- 容器：Docker Desktop 4.94 / Engine 29.8.2（WSL2 后端），`docker compose up -d` 即可起服务
