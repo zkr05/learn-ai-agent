@@ -9,10 +9,12 @@
   1) 一遍扫描为什么就够？（提示：扫到 j 的那一刻，i 在哪？）
   2) 如果题目改成「返回**所有**和为 target 的下标对」，现在写法里的哪一句会失效？为什么？
 
-自述 1：
-自述 2：
+自述 1：因为扫描的时候，会一边获得对应的值和下标,i已经存在左边，直接查找
+自述 2：现在那句return会失效，因为这样只会返回一组最先遇到的下标
 
-状态：待做
+（上面是当时能说出的原话，完整版见 notes.md 的复习5一节）
+
+状态：完成（2026-10-14 第 2 次独立重写成功）
 """
 
 import sys
@@ -23,8 +25,11 @@ if hasattr(sys.stdout, "reconfigure"):
 
 def two_sum(nums: list[int], target: int) -> list[int]:
     """返回两个下标，使对应的元素之和等于 target。"""
-    # TODO: 你来写（不看旧文件）
-    raise NotImplementedError
+    idx = {}
+    for j, x in enumerate(nums):
+        if target - x in idx:
+            return [idx[target - x], j]
+        idx[x] = j
 
 
 if __name__ == "__main__":
