@@ -7,12 +7,17 @@
 
 目标：8 分钟内写完。
 
-证明三段式（**这次的重点** —— 上次你答的是"怎么让和变大"（操作），不是"丢掉它会不会漏"（正确性））：
-  1) 瓶颈：
-  2) 排除：为什么丢掉它不会漏答案？（关键那一句 —— 要写出不等式）
-  3) 结论：
+证明三段式（**这次重点** —— 上次答的是"怎么让和变大"（操作），不是"丢掉它会不会漏"（正确性））：
+  1) 瓶颈：矮的那条边 —— 面积 = 高度 x 宽度，而高度被矮边**封顶**。
+  2) 排除（**这次答对了**：分情况写法，比一长串不等式更好讲）：
+     设 h[left] < h[right]，即 left 是矮边。对**任意** k（left < k < right）：
+       - h[k] <= h[left] 时：面积 = h[k]x(k-left) <= h[left]x(k-left) < h[left]x(right-left) = 当前面积
+       - h[k] >  h[left] 时：面积 = h[left]x(k-left) < h[left]x(right-left) = 当前面积
+     两种情况都严格更小，而且情况是**穷尽**的 -> left 再也不可能更优。
+     支点是那四个字：**矮边不变** —— 高度不能变大，想翻盘只能靠宽度，而宽度只会变小。
+  3) 结论：所以可以安全丢弃 left -> left += 1。
 
-状态：待做
+状态：完成（2026-10-19 重写成功；同时清掉 D3 逾期 4 天 + D7 当天两笔账）
 """
 
 import sys
@@ -23,8 +28,17 @@ if hasattr(sys.stdout, "reconfigure"):
 
 def max_area(height: list[int]) -> int:
     """两条竖线与 x 轴围成的容器，能装的最大水量。"""
-    # TODO: 你来写（不看旧文件）
-    raise NotImplementedError
+    left = 0
+    right = len(height) - 1
+    ans = 0
+    while left < right:
+        area = min(height[left],height[right]) * (right - left)
+        ans = max(area,ans)
+        if height[left] < height[right]:
+            left += 1
+        else:
+            right -= 1
+    return ans
 
 
 if __name__ == "__main__":
