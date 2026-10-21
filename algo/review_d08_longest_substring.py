@@ -8,14 +8,25 @@
 
   1) 三段式：窗口里出现重复时，为什么 `left` 可以**一次推好几格**？
      要写成「对任意 ___，窗口都 ___」的形式。
-     自述 1：
+     自述 1：对任意出现cnt[x] > 1,就推进，窗口都已加入推进的数
+     补全（**还是"操作"**：描述的是循环在干什么，不是"为什么丢掉的不会漏"）：
+       设 x 上一次出现在 pos（left <= pos < right）。
+       对**任意** left' <= pos，窗口 [left', right] 都**同时包含 pos 和 right 两个 x**
+       -> 窗口**不合法**。
+       所以那些更小的 left' 全部作废 -> left 可以直接跳到 pos + 1。
+       （排除类型：**根本不合法**，不是"更差"。）
 
   2) `while` 能不能换成 `if`？判据是什么？（用一句话说清，并举一个会出错的字符串）
-     自述 2：
+     自述 2：不能换成if，if的话判定的条件只会执行一次。
+     补全（说出了 if 的行为，但没给**判据**，也没给反例）：
+       判据：**一轮里可能需要多次收缩吗？** 需要就必须 while。
+       反例 "abba"：加第三个字符后窗口是 "abb"，上一个 'b' 在下标 1、left 在下标 0，
+       中间隔着一个 'a' -> 要移两次；if 只移一次会留下 "bb"（仍非法）。
 
-状态：待做
+状态：完成（2026-10-21 独立重写成功）
 """
 
+from collections import defaultdict
 import sys
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -24,10 +35,15 @@ if hasattr(sys.stdout, "reconfigure"):
 
 def length_of_longest_substring(s: str) -> int:
     """不含重复字符的最长子串长度（子串 = 连续）。"""
-    # TODO: 你来写（不看旧文件）
-    raise NotImplementedError
-
-
+    ans = left = 0
+    cnt = defaultdict(int)
+    for right, x in enumerate(s):
+        cnt[x] += 1
+        while cnt[x] > 1:
+            cnt[s[left]] -= 1
+            left += 1
+        ans = max(ans, right - left + 1)
+    return ans
 def _brute(s: str) -> int:
     best = 0
     for i in range(len(s)):
