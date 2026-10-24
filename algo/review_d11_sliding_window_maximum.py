@@ -8,12 +8,18 @@
 
   1) 两端各管什么？
      队首出队 = 扔掉 ___；队尾出队 = 扔掉 ___。
-     自述 1：
+     自述 1：队首出队=扔掉已经超过的元素，是窗口离开了；队尾出列=此时队里的元素没有新进来的元素大，而在窗口离开该数之前，
+     该数会一直跟新进来最大的元素一起，所以可以队尾可以直接出队，新的元素到队尾。
+     ✅ 对。关键那句是「在窗口离开该数之前，该数会一直跟新进来最大的元素一起」——
+     正是「**更大 + 更晚过期**」这两个性质。
 
   2) 为什么队尾可以扔？要写成「对任意 ___，都有 ___」的形式（排除论证）。
-     自述 2：
+     自述 2：对任意的 x >= nums[q[-1]],此时x比队尾元素更新更大，所以把队尾直接丢弃，不会对最大值有影响。
+     ✅ 基本对（更大 + 更新都说了）。再严谨一点：量词应该落在「包含 y 的**任意窗口**」上 ——
+     对任意包含队尾 y 的窗口，只要 y 还在，x 也一定在（x 更晚过期），而 x >= y
+     -> 那个窗口的最大值不可能是 y。
 
-状态：待做
+状态：完成（2026-10-24 独立重写成功）
 """
 
 import sys
@@ -25,8 +31,25 @@ if hasattr(sys.stdout, "reconfigure"):
 
 def max_sliding_window(nums: list[int], k: int) -> list[int]:
     """返回每个长度为 k 的窗口里的最大值。"""
-    # TODO: 你来写（不看旧文件）
-    raise NotImplementedError
+    ans = [0] * (len(nums) - k + 1)
+    q = deque()
+
+    for i ,x in enumerate(nums):
+        while q and nums[q[-1]] <= x:
+            q.pop()
+        q.append(i)
+
+        left = i - k + 1
+        if q[0] < left:
+            q.popleft()
+
+
+        if left >= 0:
+            ans[left] = nums[q[0]]
+
+    return ans
+
+
 
 
 def _brute(nums: list[int], k: int) -> list[int]:
