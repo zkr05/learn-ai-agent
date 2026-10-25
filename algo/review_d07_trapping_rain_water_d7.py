@@ -10,12 +10,21 @@
 
   1) `pre_max < suf_max` 时为什么能立刻结算 left 并丢掉？
      要写出 `min(左边最高, 右边最高) = pre_max` 这一步。
-     自述 1：
+     自述 1：对pre_max < suf_max ,此时则说明右边一定有柱子大于此时的left的对应柱子，则说明这根柱子不会导致
+     后面的数没有被记录，则可以结算推进，右边也是同理。
+     补全（**前提对了，缺那个等式** —— 10-21 你写出过，这次忘了）：
+       设 pre_max < suf_max。因为 suf_max = max(h[right..n-1]) > pre_max，
+       所以右边至少有一根柱子比 pre_max 高 -> 右边最高 >= 那根柱子 > pre_max
+       -> **min(左边最高, 右边最高) = pre_max** -> 水位 = pre_max - h[left]，完全确定。
 
   2) 空间为什么能不用那两个 O(n) 数组？（一句话，要说到"不需要精确值"）
-     自述 2：
+     自述 2：此时不需要精确的数，因为每次对比之后，都直接把这个地方的最优结果算进去了。
+     补全（「不需要精确值」说对了，但「为什么」没说）：
+       因为 min 被 pre_max **封顶** -> 「右边最高具体是多少」根本不进入计算。
+       那两个 O(n) 数组存在的理由就是「逐位置取 min 时要两边的精确值」；
+       一旦证明矮的那边就够，精确值就不需要了。
 
-状态：待做
+状态：完成（2026-10-25 第 2 次独立重写成功）
 """
 
 import sys
@@ -26,8 +35,20 @@ if hasattr(sys.stdout, "reconfigure"):
 
 def trap(height: list[int]) -> int:
     """每个位置能接的水 = min(左边最高, 右边最高) - height[i]（负数记 0）；返回总和。"""
-    # TODO: 你来写（不看旧文件）
-    raise NotImplementedError
+    n = len(height)
+    ans = pre_max = suf_max = 0
+    left = 0
+    right = n - 1
+    while left < right:
+        pre_max = max(pre_max, height[left])
+        suf_max = max(suf_max, height[right])
+        if pre_max < suf_max:
+            ans += pre_max - height[left]
+            left += 1
+        else:
+            ans += suf_max - height[right]
+            right -= 1
+    return ans
 
 
 def _ref(height: list[int]) -> int:
