@@ -9,14 +9,20 @@
   1) 你这版（前缀和 + 最小前缀）和经典 DP 是怎么对应的？
      `pre_sum - min_pre_sum` 相当于 DP 里的哪个量？
      自述 1：
+     （这次没填。参考版：`pre_sum - min_pre_sum` 就是 DP 里的 `cur`（以 i 结尾的最大子数组和）。
+      一个用「前缀和 - 最小前缀」算，一个用 `max(x, cur + x)` 递推，算的是同一个量。）
 
   2) `ans` 为什么初始化成 `-inf` 而不是 0？
-     自述 2：
+     自述 2：因为第一次比较的时候，需要有一个数一定可以更新ans的值，如果初始化为具体的值总会有反例。
+     确认：✅ 对 —— `-inf` 保证第一个真实值一定能更新 ans；任何具体值（包括 0）都会在全负数时出错。
 
   3) `min_pre_sum` 为什么必须在算完 `ans` 之后更新？先更新会变成什么？
-     自述 3：
+     自述 3：如果先更新min_pre_sum的值，则不符合题目的子数字最少包含一个元素，则如果最大和小于0，
+     则答案只会输出0.
+     确认：✅ 完全正确 —— 「子数组至少一个元素」正是这个坑的本质：
+      先更新就等于允许 `pre[i] - pre[i] = 0`，也就是空区间。
 
-状态：待做
+状态：完成（2026-10-26 独立重写成功）
 """
 
 import sys
@@ -28,9 +34,14 @@ if hasattr(sys.stdout, "reconfigure"):
 
 def max_sub_array(nums: list[int]) -> int:
     """返回和最大的连续子数组的和（至少包含一个元素）。"""
-    # TODO: 你来写（不看旧文件）
-    raise NotImplementedError
-
+    min_pre_sum = 0
+    pre_sum = 0
+    ans = -inf
+    for x in nums:
+        pre_sum += x
+        ans = max(ans,pre_sum - min_pre_sum)
+        min_pre_sum = min(pre_sum,min_pre_sum)
+    return ans
 
 def _brute(nums: list[int]) -> int:
     best = -inf
