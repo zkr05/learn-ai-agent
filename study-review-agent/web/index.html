@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <title>学习复盘周报</title>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            background: #6d6f74;
+            padding: 24px;
+        }
+
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-width: 720px;
+        }
+        
+        .card {
+            display: flex;
+            gap: 16px;
+            padding: 14px 18px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, .88);
+        }
+
+        .card:hover {
+            background: #eef4ff;
+        }
+
+        .week { font-weight: 700; width: 90px; }
+        .file { flex: 1; color: #555; }
+        .size, .date{ color: #888; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <h1>学习复盘周报</h1>
+    <div class="list"></div>
+
+    <script>
+      const reports = [
+        {week: "2026-W38", file: "2026-W38-review.md", size_bytes: 2495, date: "2026-09-18"},
+        {week: "2026-W39", file: "2026-W39-review.md", size_bytes: 2457, date: "2026-09-24" },
+        {week: "2026-W40", file: "2026-W40-review.md", size_bytes: 2229, date: "2026-09-29" },
+        {week: "2026-W41", file: "2026-W41-review.md", size_bytes: 2427, date: "2026-10-08" },
+        {week: "2026-W42", file: "2026-W42-review.md", size_bytes: 2715, date: "2026-10-13" },
+        {week: "2026-W43", file: "2026-W43-review.md", size_bytes: 3023, date: "2026-10-20" },
+      ];
+
+      let html = "";
+      for(const r of reports){
+        html += `<div class="card">
+          <span class="week">${r.week}</span>
+          <span class="file">${r.file}</span>
+          <span class="size">${r.size_bytes} 字节</span>
+          <span class="date">${r.date}</span>
+        </div>`;
+      }
+
+      document.querySelector(".list").innerHTML = html;
+    </script>
+</body>
+</html>
