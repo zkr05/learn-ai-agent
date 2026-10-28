@@ -55,6 +55,21 @@ class ReportRequest(BaseModel):
     )
 
 
+class ReportSummary(BaseModel):
+    """单份周报的目录信息（/reports 列表里的一项）。"""
+
+    week: str
+    file: str
+    size_bytes: int
+    modified: str
+
+
+class ReportList(BaseModel):
+    """GET /reports 的响应体：外面套一层对象，以后加 total/cursor 不破坏兼容。"""
+
+    reports: list[ReportSummary]
+
+
 @app.get("/health")
 def health() -> dict:
     """健康检查：服务活着就返回 ok。"""
@@ -119,7 +134,7 @@ def read_task(task_id: str) -> dict:
     return task
 
 
-@app.get("/reports")
+@app.get("/reports", response_model=ReportList)
 def list_reports() -> dict:
     """列出所有周报的目录信息（周次、文件名、大小、修改日期），不返回正文。
 
