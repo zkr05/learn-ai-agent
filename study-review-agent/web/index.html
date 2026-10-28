@@ -40,14 +40,11 @@
     <div class="list"></div>
 
     <script>
-      const reports = [
-        {week: "2026-W38", file: "2026-W38-review.md", size_bytes: 2495, date: "2026-09-18"},
-        {week: "2026-W39", file: "2026-W39-review.md", size_bytes: 2457, date: "2026-09-24" },
-        {week: "2026-W40", file: "2026-W40-review.md", size_bytes: 2229, date: "2026-09-29" },
-        {week: "2026-W41", file: "2026-W41-review.md", size_bytes: 2427, date: "2026-10-08" },
-        {week: "2026-W42", file: "2026-W42-review.md", size_bytes: 2715, date: "2026-10-13" },
-        {week: "2026-W43", file: "2026-W43-review.md", size_bytes: 3023, date: "2026-10-20" },
-      ];
+      async function render(){
+        const resp = await fetch("http://127.0.0.1:8000/reports");
+        const data = await resp.json();
+        const reports = data.reports;
+      
 
       let html = "";
       for(const r of reports){
@@ -55,11 +52,13 @@
           <span class="week">${r.week}</span>
           <span class="file">${r.file}</span>
           <span class="size">${r.size_bytes} 字节</span>
-          <span class="date">${r.date}</span>
+          <span class="date">${r.modified}</span>
         </div>`;
       }
 
       document.querySelector(".list").innerHTML = html;
+    }
+      render();
     </script>
 </body>
 </html>

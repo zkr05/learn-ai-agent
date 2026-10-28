@@ -25,12 +25,20 @@ from typing import Literal
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from fastapi.middleware.cors import CORSMiddleware
 
 from reports_store import (available_weeks, normalize_week, read_report_text,
                            report_files, week_of)
 from review_agent import run_once
 
 app = FastAPI(title="study-review agent API", version="0.1")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class ReportRequest(BaseModel):
