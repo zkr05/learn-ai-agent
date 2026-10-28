@@ -8,12 +8,15 @@
 
   1) 三次反转为什么等于「向右轮转 k 步」？
      用 A + B 的记号把三步写出来（注意用词：这三步都是**反转**，不是轮转）。
-     自述 1：
+     自述 1：A+B 反转之后变成 B转+A转，要变成B+A，则此时需要将各个部分内部反转。所以在单独变成B+A
+     ✅ 推导对，而且这次用词对了（都是「反转」）。
+     完整写全三步：① 反转整体 -> B^R + A^R；② 反转前 k 个 -> B + A^R；③ 反转后 n-k 个 -> B + A。
 
   2) 空间复杂度是多少？为什么能满足题目的进阶要求？
-     自述 2：
+     自述 2：O(1)，因为这里没有新建数组等操作，都是在修改原有的nums得到答案。
+     ✅ 对 —— 全部是原数组上的两两交换，没有额外分配。
 
-状态：待做
+状态：完成（2026-10-28 独立重写成功）
 """
 
 import sys
@@ -24,9 +27,16 @@ if hasattr(sys.stdout, "reconfigure"):
 
 def rotate(nums: list[int], k: int) -> None:
     """把数组向右轮转 k 步（原地修改，不返回）。"""
-    # TODO: 你来写（不看旧文件）
-    raise NotImplementedError
-
+    def reverse(a:int, b:int) -> None:
+        while a < b:
+            nums[a],nums[b] = nums[b],nums[a]
+            a += 1
+            b -= 1
+    n = len(nums)
+    k %= n
+    reverse(0, n-1)
+    reverse(0, k-1)
+    reverse(k, n-1)
 
 def _ref(nums: list[int], k: int) -> list[int]:
     n = len(nums)
