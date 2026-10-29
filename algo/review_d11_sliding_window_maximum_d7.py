@@ -8,13 +8,21 @@
 两个自述（第 2 次）：
 
   1) 队尾出队的排除论证，写成「对任意 ___，都 ___」。
-     自述 1：
+     自述 1：对任意nums[q[-1]] <= x ,则此时新进来的数比旧的值大或者相同，又比nums[q[-1]]更晚
+     出去，则可以直接排除掉。
+     ✅ 基本对 —— 「更大 + 更晚退出」两个性质都在，而且用上了「对任意」。
+     更硬一点：量词应该落在「包含 y 的**任意窗口**」上 ——
+     对任意包含队尾 y 的窗口，只要 y 还在，x 也一定在（x 更晚过期），而 x >= y
+     -> 那个窗口的最大值不可能是 y。
 
   2) 队首为什么用 `if` 就够、不需要 `while`？判据是什么？
      （提示：这和 D08 必须用 `while` 是同一条判据的两个结论。）
-     自述 2：
+     自述 2：因为此时的队首只需要一次排除即可，不会出现此时的窗口的数过多，需要排除多次。
+     ✅ 对，而且结论和 D08 正好相反 —— 判据是「**一轮里可能需要多次收缩吗？**」：
+     这里每轮 left 只走 1 格、下标唯一 -> 最多 1 个过期 -> `if` 够；
+     D08 里上一个重复字符可能隔好几格 -> 可能连续缩多次 -> 必须 `while`。
 
-状态：待做
+状态：完成（2026-10-29 第 2 次独立重写成功）
 """
 
 import sys
@@ -26,9 +34,20 @@ if hasattr(sys.stdout, "reconfigure"):
 
 def max_sliding_window(nums: list[int], k: int) -> list[int]:
     """返回每个长度为 k 的窗口里的最大值。"""
-    # TODO: 你来写（不看旧文件）
-    raise NotImplementedError
+    q = deque()
+    ans = [0] * (len(nums) - k + 1)
 
+    for i, x in enumerate(nums):
+        while q and nums[q[-1]] <= x:
+            q.pop()
+        else:
+            q.append(i)
+        left = i - k + 1
+        if q[0] < left:
+            q.popleft()
+        if left >= 0:
+            ans[left] = nums[q[0]]
+    return ans
 
 def _brute(nums: list[int], k: int) -> list[int]:
     return [max(nums[i:i + k]) for i in range(len(nums) - k + 1)]
