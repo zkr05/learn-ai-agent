@@ -8,12 +8,17 @@
 
   1) `while` 条件里的 `nums[nums[i]-1] != nums[i]` 是干什么的？
      （去掉会怎样？）
-     自述 1：
+     自述 1：判断此时对应的数书否在正确的位置，如果去掉，就没法从后面再遍历查看谁是缺少的数了。
+     半对：前半句方向对（判断目标位置是不是已经放了同样的值），但**「去掉会怎样」答错了**。
+     去掉的后果不是"找不到答案"，而是 **`[1,1]` 这种重复值会死循环**：
+       i=1 时 nums[1]=1，目标位置 0 已经放着 1 -> 交换两个 1 数组毫无变化 -> 无限循环。
+       （实测去掉守卫后，[1,1] / [2,2] / [1,1,1] 都超过 10 万步。）
 
   2) 每次都像嵌套循环，为什么总时间是 O(n)？
-     自述 2：
+     自述 2：因为每次都会找到一个正确的数出来，所以其实实际上是n
+     ✅ 对 —— 每次交换至少让一个数**永久归位**，总交换次数 <= n。
 
-状态：待做
+状态：完成（2026-10-30 独立重写成功）
 """
 
 import sys
@@ -24,9 +29,15 @@ if hasattr(sys.stdout, "reconfigure"):
 
 def first_missing_positive(nums: list[int]) -> int:
     """返回缺失的最小正整数（O(n) 时间 + O(1) 额外空间）。"""
-    # TODO: 你来写（不看旧文件）
-    raise NotImplementedError
-
+    n = len(nums)
+    for i in range(n):
+        while 1 <= nums[i] <= n and nums[nums[i]-1] != nums[i]:
+            j = nums[i] - 1
+            nums[j],nums[i] = nums[i],nums[j]
+    for i in range(n):
+        if nums[i]-1 != i:
+            return i + 1
+    return n + 1
 
 def _brute(nums: list[int]) -> int:
     s = set(nums)
