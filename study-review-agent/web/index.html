@@ -29,7 +29,17 @@
         .card:hover {
             background: #eef4ff;
         }
-
+        .detail {
+          max-width: 720px;
+          margin-top: 20px;
+          padding: 16px 20px;
+          background: #fff;
+          border-radius: 8px;
+          min-height: 40px;
+          font-size: 14px;
+          line-height: 1.7;
+          white-space: pre-wrap;
+        }
         .week { font-weight: 700; width: 90px; }
         .file { flex: 1; color: #555; }
         .size, .date{ color: #888; font-size: 13px; }
@@ -38,6 +48,7 @@
 <body>
     <h1>学习复盘周报</h1>
     <div class="list"></div>
+    <div class="detail"></div>
 
     <script>
       async function render(){
@@ -48,7 +59,7 @@
 
       let html = "";
       for(const r of reports){
-        html += `<div class="card">
+        html += `<div class="card" data-week="${r.week}">
           <span class="week">${r.week}</span>
           <span class="file">${r.file}</span>
           <span class="size">${r.size_bytes} 字节</span>
@@ -58,6 +69,24 @@
 
       document.querySelector(".list").innerHTML = html;
     }
+
+      const listEl = document.querySelector(".list");
+      const detailEl = document.querySelector(".detail");
+
+      listEl.addEventListener("click", async (e) => {
+        const card = e.target.closest(".card");
+        if(!card) return;
+        
+        const week = card.dataset.week;
+        if(!week) return;
+        const resp = await fetch(`http://127.0.0.1:8000/reports/${week}`);
+        if(!resp.ok){
+          detailEl.textContent = `加载失败：${resp.status}`;
+          return;
+        }
+        const data = await resp.json();
+        detailEl.textContent = data.content;
+      });
       render();
     </script>
 </body>
