@@ -19,3 +19,6 @@ run_log.local.jsonl
 
 # Pages 构建产物（派生文件，不入库）
 _site/
+# SQLite 后端产物（本地跑 STUDY_STORE=sqlite 时生成，派生文件不入库）
+*.db
+*.db-journal
