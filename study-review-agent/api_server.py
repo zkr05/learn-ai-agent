@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 
 from reports_store import (available_weeks, normalize_week, read_report_text,
-                           list_reports as store_list_reports)
+                           list_reports as store_list_reports, backend_name)
 from review_agent import run_once
 
 app = FastAPI(title="study-review agent API", version="0.1")
@@ -72,8 +72,12 @@ class ReportList(BaseModel):
 
 @app.get("/health")
 def health() -> dict:
-    """健康检查：服务活着就返回 ok。"""
-    return {"status": "ok"}
+    """健康检查：服务活着就返回 ok，并报出当前用的是哪个存储后端。
+
+    把 store 报出来是为了能一眼确认 STUDY_STORE 生效了 —— 否则切完后端
+    服务照样能起，你分不清到底是切成功了还是根本没读环境变量。
+    """
+    return {"status": "ok", "store": backend_name()}
 
 
 # ---------------------------------------------------------------- 后台任务

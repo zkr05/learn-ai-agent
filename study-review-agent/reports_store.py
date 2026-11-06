@@ -30,12 +30,22 @@ from store.file_backend import REPORTS_DIR  # noqa: F401
 _BACKENDS = {"file": file_backend, "sqlite": sqlite_backend}
 
 
-def _backend():
-    """按 STUDY_STORE 选后端；名字写错立刻报错，不静默降级。"""
+def _backend_name() -> str:
+    """解析 STUDY_STORE；名字写错立刻报错，不静默降级。"""
     name = (os.environ.get("STUDY_STORE") or "file").strip().lower()
     if name not in _BACKENDS:
         raise ValueError(f"未知的 STUDY_STORE={name!r}，可选：{sorted(_BACKENDS)}")
-    return _BACKENDS[name]
+    return name
+
+
+def _backend():
+    """按 STUDY_STORE 选后端。"""
+    return _BACKENDS[_backend_name()]
+
+
+def backend_name() -> str:
+    """当前生效的后端名（file / sqlite）—— 给健康检查和日志用。"""
+    return _backend_name()
 
 
 # ---------------------------------------------------------------- 后端无关的接口
