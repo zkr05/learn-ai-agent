@@ -1,0 +1,43 @@
+name: ci
+
+# 每次推 master / 发 PR 都验证 —— 和"周一自动生成"那条流水线分开：
+#   weekly-review.yml  负责「生成」（会真调 API，花钱，只在 cron / 手动触发）
+#   ci.yml             负责「验证」（不调外部服务，几秒钟，push 就触发）
+on:
+  push:
+    branches: [master]
+  pull_request: {}
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# 同一分支只保留最新一次，避免连续推送排队
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      # 存储层只用标准库，先跑这个 —— 最快的反馈放最前面
+      - name: 存储层契约测试（file + sqlite 两个后端）
+        run: cd study-review-agent && python test_store_contract.py
+
+      - name: 装依赖
+        run: pip install -r study-review-agent/requirements.txt
+
+      - name: MCP 工具验收（3 个工具 / 11 组断言）
+        run: cd study-review-agent && python test_mcp_reports.py
+
+      - name: 站点构建（确认上层在文件后端下仍能构建）
+        run: python study-review-agent/build_reports_site.py
