@@ -83,6 +83,14 @@ def run_contract(mod, name):
         raise AssertionError(f"{name}: modified 不是合法 ISO 时间：{meta.modified!r}")
     print(f"  ✅ modified 是合法 ISO：{meta.modified}")
 
+    # 7) 显式 created_at（迁移/回填用）：写进去什么时间，读出来就是什么时间
+    given = "2026-01-02T03:04:05+00:00"
+    mod.write_report("2026-W03", "回填测试\n", created_at=given)
+    backfill = {m.week: m for m in mod.list_reports()}["2026-W03"]
+    check(backfill.modified == given,
+          f"{name}: 显式 created_at 应被原样保留，期望 {given}，实得 {backfill.modified}")
+    print(f"  ✅ 显式 created_at 被保留：{given}")
+
     return {"2026-W01": len(text_a.encode("utf-8")),
             "2026-W02": len(text_b2.encode("utf-8"))}
 

@@ -21,10 +21,11 @@ import re
 from store import file_backend, sqlite_backend
 from store.base import ReportMeta
 
-# 兼容旧调用：review_agent 用 REPORTS_DIR 定位 run_log.jsonl，
-# build_reports_site 还需要真实文件。这两处属于"发布/日志"职责，
-# 不是"报告存储"职责，暂时保留；迁移完成后可以只留 REPORTS_DIR。
-from store.file_backend import REPORTS_DIR, report_files, report_path, week_of  # noqa: F401
+# 唯一保留的路径导出：review_agent 用它定位 run_log.jsonl 和本地草稿。
+# 这属于"运行日志 / 临时产物"职责，不是"报告存储"职责。
+# 报告本身的读写一律走上面的 5 个函数 —— 之前导出的 report_files / week_of /
+# report_path 已经全部删除，上层再也拿不到 Path 了。
+from store.file_backend import REPORTS_DIR  # noqa: F401
 
 _BACKENDS = {"file": file_backend, "sqlite": sqlite_backend}
 
@@ -53,9 +54,9 @@ def read_report_text(week: str) -> str | None:
     return _backend().read_report_text(week)
 
 
-def write_report(week: str, text: str) -> None:
-    """写入/覆盖一周报告（幂等）。"""
-    return _backend().write_report(week, text)
+def write_report(week: str, text: str, created_at: str | None = None) -> None:
+    """写入/覆盖一周报告（幂等）。created_at 可选，用于迁移/回填保留历史时间。"""
+    return _backend().write_report(week, text, created_at)
 
 
 def available_weeks() -> list[str]:

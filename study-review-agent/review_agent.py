@@ -29,7 +29,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from agent_kit import (env, resolve_backend, timed, call_llm,
                        estimate_cost, append_run_log, check_structure, ToolRegistry)
-from reports_store import REPORTS_DIR, report_files
+from reports_store import REPORTS_DIR, list_reports, read_report_text, write_report
 
 RUN_LOG_PATH = REPORTS_DIR / "run_log.jsonl"
 LOCAL_RUN_LOG_PATH = REPORTS_DIR / "run_log.local.jsonl"
@@ -126,14 +126,16 @@ def read_selfcheck() -> dict:
 def read_last_report() -> dict:
     """取最新一份报告，读前 3000 字符。没有则返回 {"memory": None}。"""
     try:
-        files = report_files()
-        if not files:
+        metas = list_reports()
+        if not metas:
             return {"memory": None}
-        latest = files[-1]
-        content = latest.read_text(encoding="utf-8")[:3000]
-        return {"memory": content, "file": latest.name}
+        latest = metas[-1]
+        text = read_report_text(latest.week)
+        if text is None:
+            return {"memory": None}
+        return {"memory": text[:3000], "file": f"{latest.week}-review.md"}
     except Exception as e:
-        return {"error": f"错误原因{e}", "retry_hint": "检查文件是否存在"}
+        return {"error": f"错误原因{e}", "retry_hint": "检查存储后端是否可用"}
 
 
 def collect_context(days: int, stats: list) -> dict:
@@ -200,9 +202,9 @@ def report_filename(now: datetime | None = None) -> str:
     now = now or datetime.now(CST)
     iso = now.isocalendar()
     # ⚠️ 这里是 "-review.md" 命名约定的唯一定义处，但另外几处代码都假设了它，改这里必须同步改：
-    #    read_last_report()（读的时候用 glob 匹配）
-    #    mcp_reports_server.py 的 REPORTS_GLOB / _week_of
-    #    build_reports_site.py 的 REPORTS_GLOB / week_of
+    #    store/file_backend.py 的 REPORTS_GLOB（file 后端靠它扫文件）
+    #    build_reports_site.py 里生成站点文件名的地方
+    #    （读报告已经统一走 reports_store.read_report_text(week)，不再依赖文件名）
     #    （用符号名而不是行号来指位置 —— 行号会随编辑漂移）
     return f"{iso.year}-W{iso.week:02d}-review.md"
 
@@ -298,16 +300,22 @@ def run_once(backend: str = "auto", days: int = 7) -> dict:
     context = collect_context(days, stats)
     report, tokens = generate_report(client, cfg, context, stats)
 
-    REPORTS_DIR.mkdir(exist_ok=True)
-    report_path = REPORTS_DIR / report_filename()
-    if cfg["name"] != "cloud":
-        report_path = report_path.with_suffix(".local.md")
-    report_path.write_text(report, encoding="utf-8")
+    week = report_filename().removesuffix("-review.md")
+    if cfg["name"] == "cloud":
+        # 正式报告进存储层（file / sqlite 由 STUDY_STORE 决定）
+        write_report(week, report)
+        filename = f"{week}-review.md"
+    else:
+        # 本地草稿不进存储层：它是临时产物，被 .gitignore 忽略，也不该进数据库
+        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        draft = REPORTS_DIR / f"{week}-review.local.md"
+        draft.write_text(report, encoding="utf-8", newline="")
+        filename = draft.name
 
     cost = estimate_cost(cfg, tokens)
     append_run_log({
         "event": "report",
-        "file": report_path.name,
+        "file": filename,
         "days": days,
         "backend": cfg["name"],
         "tokens": tokens,
@@ -316,7 +324,7 @@ def run_once(backend: str = "auto", days: int = 7) -> dict:
     }, run_log_path(cfg))
     return {
         "backend": cfg["name"],
-        "file": report_path.name,
+        "file": filename,
         "tokens": tokens,
         "cost": cost,
         "stats": stats,

@@ -14,6 +14,7 @@ import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from contextlib import closing
 
 from store.base import ReportMeta
 
@@ -56,44 +57,53 @@ def available_weeks() -> list[str]:
     这是已经写好的样例 —— 看它怎么"开连接 / 执行 / 取列"，
     下面三个 TODO 都是同一个套路。
     """
-    with _connect() as conn:
+    with closing(_connect()) as conn:
         rows = conn.execute("SELECT week FROM reports ORDER BY week").fetchall()
     return [r["week"] for r in rows]
 
 
 def read_report_text(week: str) -> str | None:
     """读正文；没有这一周返回 None。"""
-    # TODO 3：查一条
-    #   1) with _connect() as conn:
-    #   2) row = conn.execute(
-    #          "SELECT content FROM reports WHERE week = ?", (week,)
-    #      ).fetchone()
-    #   3) row is None -> 返回 None；否则返回 row["content"]
-    # 注意：? 是参数占位符，绝不要写成 f"... WHERE week = '{week}'"
-    raise NotImplementedError("sqlite_backend.read_report_text")
+    with closing(_connect()) as conn:
+        row = conn.execute(
+            "SELECT content FROM reports WHERE week = ?",
+            (week,),
+        ).fetchone()
+    if row is None:
+        return None
+    return row["content"]
 
 
-def write_report(week: str, text: str) -> None:
-    """写入/覆盖一周的报告。要求幂等。"""
-    # TODO 4：UPSERT
-    #   1) init_db()   # 保证表存在（幂等）
-    #   2) now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-    #   3) with _connect() as conn:
-    #          conn.execute("""
-    #              INSERT INTO reports (week, content, created_at) VALUES (?, ?, ?)
-    #              ON CONFLICT(week) DO UPDATE SET
-    #                  content    = excluded.content,
-    #                  created_at = excluded.created_at
-    #          """, (week, text, now))
-    #   "ON CONFLICT(week) DO UPDATE" 就是 SQL 版的"有则更新、无则插入"。
-    #   没有它，同一个 week 写第二次会抛 UNIQUE constraint failed。
-    raise NotImplementedError("sqlite_backend.write_report")
+def write_report(week: str, text: str, created_at: str | None = None) -> None:
+    """写入/覆盖一周的报告。要求幂等。
 
+    created_at 不为空时用它当时间戳（迁移/回填），否则用当前 UTC 时间。
+    """
+    init_db()
+    stamp = created_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    with closing(_connect()) as conn, conn:
+        conn.execute(
+            """
+            INSERT INTO reports (week, content, created_at) VALUES (?, ?, ?)
+            ON CONFLICT(week) DO UPDATE SET
+                content    = excluded.content,
+                created_at = excluded.created_at
+            """,
+            (week, text, stamp),
+        )
 
 def list_reports() -> list[ReportMeta]:
     """全部报告元信息，按 week 升序。"""
-    # TODO 5：一次查出三列
-    #   SELECT week, content, created_at FROM reports ORDER BY week
-    #   size_bytes 怎么算？表里没存这一列 —— 用 len(content.encode("utf-8"))
-    #   （这正是"文件后端用 st_size、DB 后端现算"的差异：接口一致，实现自由。）
-    raise NotImplementedError("sqlite_backend.list_reports")
+    with closing(_connect()) as conn:
+        rows = conn.execute(
+            "SELECT week, content, created_at FROM reports ORDER BY week"
+        ).fetchall()
+
+    return [
+        ReportMeta(
+            week=r["week"],
+            size_bytes=len(r["content"].encode("utf-8")),
+            modified=r["created_at"],
+        )
+        for r in rows
+    ]

@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 
 from reports_store import (available_weeks, normalize_week, read_report_text,
-                           report_files, week_of)
+                           list_reports as store_list_reports)
 from review_agent import run_once
 
 app = FastAPI(title="study-review agent API", version="0.1")
@@ -141,13 +141,13 @@ def list_reports() -> dict:
     只想看某一周的正文，用 GET /reports/{week}。
     """
     reports = []
-    for f in report_files():
-        stat = f.stat()
+    for m in store_list_reports():
         reports.append({
-            "week": week_of(f),
-            "file": f.name,
-            "size_bytes": stat.st_size,
-            "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d"),
+            "week": m.week,
+            "file": f"{m.week}-review.md",
+            "size_bytes": m.size_bytes,
+            # 契约里 modified 是 ISO(UTC)；展示要转回本地时区，否则凌晨写的报告会差一天
+            "modified": datetime.fromisoformat(m.modified).astimezone().strftime("%Y-%m-%d"),
         })
     return {"reports": reports}
 

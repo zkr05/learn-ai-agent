@@ -11,6 +11,7 @@
 
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -38,7 +39,11 @@ def main() -> int:
         if text is None:                      # 理论不会发生，防御一下
             print(f"  ⚠️ 读不到 {week}，跳过")
             continue
-        sqlite_backend.write_report(week, text)
+        # 用文件原本的修改时间回填，否则所有历史报告的时间都会变成"迁移那一刻"
+        mtime = file_backend.report_path(week).stat().st_mtime
+        stamp = datetime.fromtimestamp(mtime, tz=timezone.utc).replace(
+            microsecond=0).isoformat()
+        sqlite_backend.write_report(week, text, created_at=stamp)
         added.append(week)
 
     # 3) 报告

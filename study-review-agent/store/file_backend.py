@@ -40,17 +40,24 @@ def report_path(week: str) -> Path:
 
 def list_reports() -> list[ReportMeta]:
     """全部报告元信息，按 week 升序。"""
-    # TODO 1：遍历 report_files()，为每个文件造一个 ReportMeta
-    #   1) week = week_of(path)
-    #   2) st = path.stat()
-    #   3) size_bytes 用 st.st_size（文件字节数）
-    #   4) modified 用 datetime.fromtimestamp(st.st_mtime, tz=timezone.utc)
-    #        .replace(microsecond=0).isoformat()
-    #      注意：.isoformat() 的输出要能被 fromisoformat() 读回来，
-    #      否则契约测试里"两个后端 time 字段格式一致"这条会挂。
-    #   ---
-    #   或者更省事：直接复用磁盘上的真实值，别自己编时间。
-    raise NotImplementedError("file_backend.list_reports")
+    out = []
+    for path in report_files():
+        st = path.stat()
+        out.append(ReportMeta(
+            week=week_of(path),
+            # ⚠️ 不能用 st.st_size：Windows 上工作区文件是 CRLF，磁盘字节比内容字节多。
+            #    契约定义是"正文的 UTF-8 字节数"，所以读出来按 LF 再算。
+            size_bytes=len(path.read_text(encoding="utf-8").encode("utf-8")),
+            modified=(
+                datetime.fromtimestamp(st.st_mtime, tz=timezone.utc)
+                .replace(microsecond=0)
+
+                .isoformat()
+            ),
+        ))
+
+    out.sort(key=lambda item: item.week)
+    return out
 
 
 def read_report_text(week: str) -> str | None:
@@ -61,13 +68,16 @@ def read_report_text(week: str) -> str | None:
     return path.read_text(encoding="utf-8")
 
 
-def write_report(week: str, text: str) -> None:
-    """写入/覆盖一周的报告。要求幂等。"""
-    # TODO 2：写文件
-    #   1) REPORTS_DIR.mkdir(parents=True, exist_ok=True)   # 目录可能不存在
-    #   2) report_path(week).write_text(text, encoding="utf-8")
-    #   幂等性由"覆盖写"天然满足 —— 想想为什么文件后端不需要 UPSERT 这种语法。
-    raise NotImplementedError("file_backend.write_report")
+def write_report(week: str, text: str, created_at: str | None = None) -> None:
+    """写入/覆盖一周的报告。要求幂等。
+
+    created_at 不为空时把文件修改时间改成它 —— 迁移/回填时用来保留历史时间。
+    """
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    report_path(week).write_text(text, encoding="utf-8", newline="")
+    if created_at:
+        ts = datetime.fromisoformat(created_at).timestamp()
+        os.utime(report_path(week), (ts, ts))
 
 
 def available_weeks() -> list[str]:

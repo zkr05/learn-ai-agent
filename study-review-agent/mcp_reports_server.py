@@ -10,7 +10,7 @@ from datetime import datetime
 from fastmcp import FastMCP
 
 from reports_store import (available_weeks, normalize_week, read_report_text,
-                           report_files, week_of)
+                           list_reports as store_list_reports)
 
 mcp = FastMCP("study-reports")
 
@@ -19,13 +19,12 @@ mcp = FastMCP("study-reports")
 def list_reports() -> dict:
     """列出所有周报的目录信息（周次、文件名、大小、修改日期），不返回正文。"""
     reports = []
-    for f in report_files():
-        stat = f.stat()
+    for m in store_list_reports():
         reports.append({
-            "week": week_of(f),
-            "file": f.name,
-            "size_bytes": stat.st_size,
-            "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d"),
+            "week": m.week,
+            "file": f"{m.week}-review.md",
+            "size_bytes": m.size_bytes,
+            "modified": datetime.fromisoformat(m.modified).astimezone().strftime("%Y-%m-%d"),
         })
     if not reports:
         return {"reports": [], "note": "报告为空"}
@@ -65,14 +64,17 @@ def search_reports(keyword: str, limit: int = 30) -> dict:
 
     matches = []
     total = 0
-    for f in report_files():
-        lines = f.read_text(encoding="utf-8").splitlines()
+    for meta in store_list_reports():
+        text = read_report_text(meta.week)
+        if text is None:
+            continue
+        lines = text.splitlines()
         for lineno, line in enumerate(lines, 1):
             if kw in line.lower():
                 total += 1
                 if len(matches) < limit:
                     matches.append({
-                        "week": week_of(f),
+                        "week": meta.week,
                         "line": lineno,
                         "text": line.strip(),
                     })
