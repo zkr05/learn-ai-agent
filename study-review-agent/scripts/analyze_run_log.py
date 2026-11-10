@@ -35,25 +35,17 @@ OUT_CSV = BASE / "reports" / "run_log_stats.csv"
 # ---------------------------------------------------------------- 1. 读入
 def load(path: Path = LOG_PATH) -> pd.DataFrame:
     """读 JSONL -> DataFrame。"""
-    # TODO 1：一行就够
-    #   df = pd.read_json(path, lines=True)
-    # 不加 lines=True 会报 "Trailing data"（因为它会当成 JSON 数组解析）
-    raise NotImplementedError("load")
-
+    df = pd.read_json(path, lines=True)
+    return df
 
 # ---------------------------------------------------------------- 2. 拍平
 def flatten(df: pd.DataFrame) -> pd.DataFrame:
     """把嵌套的 tokens 列拍平成 in_tok / out_tok 两列。"""
-    # TODO 2：四步
-    #   1) tok = pd.json_normalize(df["tokens"])
-    #        dict 会被拆成列；那一行是 NaN 的，会得到两个 NaN
-    #   2) tok.columns = ["in_tok", "out_tok"]
-    #        原始列名是 input/output，改短一点，也避免以后和别的列撞名
-    #   3) df = pd.concat([df, tok], axis=1)
-    #        axis=1 = 横向拼接（作为新列）；axis=0 是竖着摞行
-    #   4) df = df.drop(columns=["tokens"])
-    #        原来的 dict 列没用了，删掉
-    raise NotImplementedError("flatten")
+    tok = pd.json_normalize(df["tokens"])
+    tok.columns = ["in_tok", "out_tok"]
+    df = pd.concat([df, tok], axis=1)
+    df = df.drop(columns=["tokens"])
+    return df
 
 
 # ---------------------------------------------------------------- 3. 清洗
@@ -67,38 +59,31 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
         cost 空 + local          真没花钱                    填 0.0
         cost 空 + cloud          数据缺失（异常！）           保持 NaN，不许填 0
     """
-    # TODO 3
-    #   先做一次验证再动手（这是好习惯，别猜）：
-    #     df[df.backend.isna()]["event"].value_counts()
-    #     df[df.cost.isna()]["backend"].value_counts(dropna=False)
-    #
-    #   a) df["backend"] = df["backend"].fillna("(eval)")
-    #   b) 只给 local 填 0：df.loc[df["backend"] == "local", "cost"] = df.loc[...].fillna(0.0)
-    #      或者：mask = (df["backend"] == "local") & df["cost"].isna()
-    #            df.loc[mask, "cost"] = 0.0
-    #   c) cloud 缺 cost 的那条，故意**不动**它，让它保持 NaN
-    #   d) in_tok / out_tok：fillna(0).astype(int)
-    #      为什么要 astype(int)：拍平后因为有 NaN，列变成了 float（1185.0）。
-    #      token 不可能是小数，转成 int 输出 CSV 才不会出现 .0
-    #      注意：astype(int) 之前必须没有 NaN，否则报错
-    raise NotImplementedError("clean")
 
+    df = df.copy()
+
+    df["backend"] = df["backend"].fillna("(eval)")
+    mask = (df["backend"] == "local") & df["cost"].isna()
+    df.loc[mask, "cost"] = 0.0
+
+    df["in_tok"] = df["in_tok"].fillna(0).astype(int)
+    df["out_tok"] = df["out_tok"].fillna(0).astype(int)
+
+    return df
+    
 
 # ---------------------------------------------------------------- 4. 聚合
 def summarize(df: pd.DataFrame) -> pd.DataFrame:
     """按 backend 汇总：次数 / 输入 token / 平均输出 / 总成本。"""
-    # TODO 4：和 SQL 的 GROUP BY 是同一件事
-    #   stat = df.groupby("backend").agg(
-    #       次数=("event", "size"),
-    #       输入token=("in_tok", "sum"),
-    #       平均输出=("out_tok", "mean"),
-    #       总成本=("cost", "sum"),
-    #   ).round(4)
-    #   agg 的写法是 新列名=("原列名", "聚合函数")
-    #
-    #   ⚠️ cost 里还有 NaN（云端缺成本那条）。sum() 默认会跳过 NaN ——
-    #      这是对的行为，但意味着"总成本少算了一条"。所以下面 report() 要单独报缺失条数。
-    raise NotImplementedError("summarize")
+
+    stat = df.groupby("backend").agg(
+        次数=("event", "size"),
+        输入token=("in_tok", "sum"),
+        平均输出=("out_tok", "mean"),
+        总成本=("cost", "sum"),
+    ).round(4)
+    return stat
+
 
 
 # ---------------------------------------------------------------- 5. 输出
