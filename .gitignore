@@ -22,3 +22,5 @@ _site/
 # SQLite 后端产物（本地跑 STUDY_STORE=sqlite 时生成，派生文件不入库）
 *.db
 *.db-journal
+# 分析脚本的产物（派生文件，不入库）
+run_log_stats.csv
