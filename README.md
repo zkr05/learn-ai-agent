@@ -66,7 +66,7 @@ CLI 只能人手动跑，MCP 只能给 MCP 客户端用。为了让**任何**程
 | 业务层 | `review_agent.run_once()` | 采集 -> 生成 -> 落盘 |
 | 核心层 | `agent_kit.py` | 后端解析 / 计时 / 记账 / 工具注册 |
 
-判断一个文件属于哪层：**看它 import 了什么**。`api_server.py` 只 import 了 `reports_store` 和 `run_once`，自己没有业务规则 —— 所以它是接口层。
+`api_server.py` 把 HTTP 请求交给 `run_once()` 执行，通过 `reports_store.py` 读取周报，通过 `task_store.py` 记录任务状态。
 
 | 关键设计 | 为什么这么做 |
 |---|---|
@@ -82,7 +82,11 @@ CLI 只能人手动跑，MCP 只能给 MCP 客户端用。为了让**任何**程
 1. `python:3.11-slim` 里**没有 `git`**，而 `git_log` 工具要 `subprocess` 跑 `git log` —— 静态检查在结构上看不出「缺一个系统二进制」
 2. 本机代理（fake-ip 模式）把 `deb.debian.org` 解析成假地址：apt 走 http 得到 **502**、换 https 得到 **SSL EOF**，而 pip 走 443 却是通的 —— 症状自相矛盾，**代理会让「网络问题」伪装成「镜像问题」**
 
-**已知缺陷（面试会问，自己先想清楚）**：`TASKS` 只增不减（内存泄漏）；任务表在内存里，进程重启就丢（要可靠得 Celery + Redis）；后台任务**没有并发上限**（10 个请求就真跑 10 次 LLM，成本失控）；**没有鉴权**（任何人都能烧钱）。
+任务状态和结果写入独立的 SQLite 文件。仍用 `POST /report` 创建任务，用返回的 ID 轮询 `GET /tasks/{id}`。本地默认使用 `study-review-agent/.local/tasks.db`，可用 `STUDY_TASK_DB_PATH` 覆盖；Compose 将任务库单独挂载到 `task-data` 卷。保留数据库文件或数据卷时，服务重启后仍可查询已完成或失败的任务。SQLite 任务库不改变周报的存储配置。
+
+本地复现：在仓库根目录运行 `docker compose up -d --build`，用 `/docs` 创建一条任务，等它完成后记下 ID。运行 `docker compose restart api`，再查原来的 `GET /tasks/{id}`。重新创建容器时也要保留 `task-data` 卷。
+
+当前后台执行器按单实例、单 worker 运行。重启时把未结束的任务标成失败，需要重新提交。任务没有自动清理、并发上限或接口鉴权，适用于本地演示。
 
 ## 🌐 在线站点：周报静态网站
 
@@ -166,7 +170,7 @@ learn-ai-agent/
 ├── agent_kit.py                 # 可复用 harness：后端解析/计时/LLM记账/成本/遥测/工具注册/结构校验
 ├── LEARNING-ROUTE.md            # Stage 0-7 复习地图 + 代码模板 + 踩坑记录
 ├── Dockerfile                   # 容器镜像配方：分层缓存 / 装 git / exec 形式 CMD
-├── docker-compose.yml           # 运行编排：端口映射 / 环境变量 / 报告目录持久化挂载
+├── docker-compose.yml           # 运行编排：端口映射 / 环境变量 / 周报和任务存储挂载
 ├── .dockerignore                # 构建上下文 206MB -> 53kB
 ├── notes/                       # 工程笔记（MCP 跨宿主排障记录等）
 ├── study-review-agent/          # 🏆 毕业设计：自动复盘 agent + HTTP 服务层 + MCP server + 周报站点

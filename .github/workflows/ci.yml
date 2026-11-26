@@ -36,6 +36,9 @@ jobs:
       - name: 装依赖
         run: pip install -r study-review-agent/requirements.txt
 
+      - name: SQLite 任务持久化（不调用模型）
+        run: cd study-review-agent && python test_task_persistence.py
+
       - name: MCP 工具验收（3 个工具 / 11 组断言）
         run: cd study-review-agent && python test_mcp_reports.py
 

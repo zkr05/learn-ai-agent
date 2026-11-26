@@ -19,8 +19,11 @@ run_log.local.jsonl
 
 # Pages 构建产物（派生文件，不入库）
 _site/
-# SQLite 后端产物（本地跑 STUDY_STORE=sqlite 时生成，派生文件不入库）
+# 本地 SQLite 周报和任务数据
+/study-review-agent/.local/
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 # 分析脚本的产物（派生文件，不入库）
 run_log_stats.csv

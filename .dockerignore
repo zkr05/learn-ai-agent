@@ -34,6 +34,11 @@ node_modules/
 run_log.local.jsonl
 *.part
 *.tmp
+study-review-agent/.local/
+**/*.db
+**/*.db-journal
+**/*.db-wal
+**/*.db-shm
 
 # 密钥 —— 绝对不能进镜像（镜像会被 push 到 registry）
 .env

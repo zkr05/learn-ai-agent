@@ -15,6 +15,7 @@ services:
 
     environment:
       REVIEW_BACKEND: ${REVIEW_BACKEND:-local}
+      STUDY_TASK_DB_PATH: /app/task-data/tasks.db
       # 关键：容器里的 localhost 指的是**容器自己**，连不到宿主机的 Ollama。
       # host.docker.internal 是 Docker 提供的一个特殊域名，指向宿主机。
       LOCAL_BASE_URL: ${LOCAL_BASE_URL:-http://host.docker.internal:11434/v1}
@@ -28,5 +29,9 @@ services:
     # 报告持久化：容器删了重建，reports/ 里的周报不能跟着没。
     volumes:
       - ./study-review-agent/reports:/app/study-review-agent/reports
+      - task-data:/app/task-data
 
     restart: unless-stopped
+
+volumes:
+  task-data:
